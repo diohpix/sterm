@@ -1,0 +1,315 @@
+import { Button, VerticalBox, HorizontalBox, TextEdit, ScrollView, LineEdit } from "std-widgets.slint";
+
+export struct TerminalState {
+    content: string,
+    cursor_x: int,
+    cursor_y: int,
+    font_size: int,
+    background_color: color,
+    foreground_color: color,
+}
+
+export struct TabInfo {
+    title: string,
+    active: bool,
+    id: int,
+}
+
+export component TabBar inherits Rectangle {
+    in-out property <[TabInfo]> tabs: [];
+    in-out property <int> active_tab: 0;
+    
+    callback tab_clicked(int);
+    callback new_tab_clicked();
+    callback close_tab_clicked(int);
+    
+    background: #2b2b2b;
+    height: 32px;
+    
+    HorizontalBox {
+        spacing: 2px;
+        padding: 4px;
+        
+        for tab[index] in tabs: Rectangle {
+            width: 150px;
+            height: 24px;
+            background: tab.active ? #404040 : #353535;
+            border-radius: 4px;
+            
+            HorizontalBox {
+                padding: 4px;
+                spacing: 8px;
+                
+                Text {
+                    text: tab.title;
+                    color: tab.active ? white : #cccccc;
+                    font-size: 12px;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+                
+                Button {
+                    text: "×";
+                    width: 16px;
+                    height: 16px;
+                    clicked => {
+                        close_tab_clicked(tab.id);
+                    }
+                }
+            }
+            
+            TouchArea {
+                clicked => {
+                    tab_clicked(tab.id);
+                }
+            }
+        }
+        
+        Button {
+            text: "+";
+            width: 24px;
+            height: 24px;
+            clicked => {
+                new_tab_clicked();
+            }
+        }
+    }
+}
+
+// 색상 세그먼트 구조체
+export struct ColorSegment {
+    text: string,
+    fg_r: int,
+    fg_g: int,
+    fg_b: int,
+    bg_r: int,
+    bg_g: int,
+    bg_b: int,
+    line: int,
+    start_col: int,
+    accumulated_x: int,  // 누적 X 위치 (픽셀)
+    text_width: int,     // 텍스트 폭 (픽셀)
+}
+
+export component TerminalView inherits Rectangle {
+    in-out property <TerminalState> state;
+    in-out property <string> terminal_content: "";
+    in-out property <[ColorSegment]> color_segments: [];
+    in-out property <bool> has_selection: false;
+    in-out property <string> selected_text: "";
+    
+    callback terminal_input(string);
+    callback terminal_resize(int, int);
+    callback copy_selected();
+    callback paste_clipboard();
+    
+    background: state.background_color;
+    
+    ScrollView {
+        viewport-width: parent.width;
+        viewport-height: parent.height;
+        
+        Rectangle {
+            width: 100%;
+            height: max(self.preferred-height, parent.visible-height);
+            
+            // 선택 영역 배경 (텍스트 뒤에 렌더링)
+            if has_selection: Rectangle {
+                // 간단한 선택 영역 표시 (실제로는 더 복잡한 계산 필요)
+                x: 8px;
+                y: 8px;
+                width: 200px; // 임시 크기
+                height: state.font_size * 1px;
+                background: #4a90e2;
+                opacity: 0.3;
+            }
+            
+            // 기본 터미널 내용 표시 (색상 세그먼트가 없을 때만)
+            
+            
+            // 색상 세그먼트들을 배경색과 함께 렌더링 (누적 위치 사용)
+            for segment[i] in color_segments: Rectangle {
+                x: 8px + segment.accumulated_x * 1px;  // 누적 X 위치 사용
+                y: 8px + segment.line * 16px;  // 줄 간격 16px
+                width: segment.text_width * 1px;  // 실제 텍스트 폭 사용
+                height: 16px;
+                background: rgb(segment.bg_r, segment.bg_g, segment.bg_b);
+                visible: segment.text != "\n";  // 줄바꿈 문자는 숨김
+                
+                Text {
+                    text: segment.text;
+                    color: rgb(segment.fg_r, segment.fg_g, segment.fg_b);
+                    font-family: "D2Coding";
+                    font-size: state.font_size * 1px;
+                    x: 0;
+                    y: 0;
+                    width: parent.width;
+                    height: parent.height;
+                    wrap: no-wrap;
+                    vertical-alignment: center;
+                    horizontal-alignment: left;
+                }
+            }
+            
+            
+            // Cursor
+            Rectangle {
+                x: 8px + state.cursor_x * 8px;
+                y: 8px + state.cursor_y * state.font_size * 1px;
+                width: 8px;
+                height: state.font_size * 1px;
+                background: white;
+                opacity: 0.8;
+                
+                animate opacity {
+                    duration: 500ms;
+                    iteration-count: -1;
+                }
+            }
+        }
+    }
+    
+    // 숨겨진 LineEdit으로 키보드 입력 처리
+    LineEdit {
+        x: -1000px;
+        y: -1000px;
+        width: 1px;
+        height: 1px;
+        opacity: 0.01;
+        
+        accepted(text) => {
+            if (text != "") {
+                terminal_input(text + "\n"); // Enter key pressed
+                self.text = "";
+            }
+        }
+        
+        edited(text) => {
+            if (text != "") {
+                terminal_input(text);
+                self.text = "";
+            }
+        }
+    }
+    
+    TouchArea {
+        width: 100%;
+        height: 100%;
+        
+        property <bool> is_selecting: false;
+        property <float> selection_start_x: 0;
+        property <float> selection_start_y: 0;
+        property <float> current_x: 0;
+        property <float> current_y: 0;
+        
+        // 마우스 누름 - 텍스트 입력에 포커스 설정
+        clicked => {
+            // 단순 클릭으로는 선택 해제
+            has_selection = false;
+            // 숨겨진 텍스트 입력에 포커스 설정 (키보드 입력을 받기 위해)
+            // TODO: 포커스 설정 방법 개선 필요
+        }
+        
+        // 더블클릭으로 단어 선택
+        double-clicked => {
+            has_selection = true;
+            selected_text = "word selection placeholder";
+            copy_selected();
+        }
+        
+        // 마우스 드래그로 텍스트 선택 (단순화)
+        moved => {
+            // 나중에 실제 드래그 선택 구현
+        }
+    }
+}
+
+export component MainWindow inherits Window {
+    title: "STerm";
+    width: 800px;
+    height: 600px;
+    background: #1e1e1e;
+    
+    in-out property <[TabInfo]> tabs: [
+        { title: "Terminal", active: true, id: 0 }
+    ];
+    in-out property <int> active_tab: 0;
+    in-out property <TerminalState> terminal_state: {
+        content: "",
+        cursor_x: 0,
+        cursor_y: 0,
+        font_size: 11,
+        background_color: #1e1e1e,
+        foreground_color: #ffffff,
+    };
+    in-out property <string> terminal_content: "Welcome to STerm!\n$ ";
+    in-out property <[ColorSegment]> color_segments: [];
+    
+    callback tab_clicked(int);
+    callback new_tab_clicked();
+    callback close_tab_clicked(int);
+    callback terminal_input(string);
+    callback window_resized(int, int);
+    callback copy_selected();
+    callback paste_clipboard();
+    
+    VerticalBox {
+        spacing: 0px;
+        
+        TabBar {
+            tabs: tabs;
+            active_tab: active_tab;
+            
+            tab_clicked(id) => {
+                tab_clicked(id);
+            }
+            
+            new_tab_clicked() => {
+                new_tab_clicked();
+            }
+            
+            close_tab_clicked(id) => {
+                close_tab_clicked(id);
+            }
+        }
+        
+        TerminalView {
+            state: terminal_state;
+            terminal_content: terminal_content;
+            color_segments: color_segments;
+            
+            terminal_input(text) => {
+                terminal_input(text);
+            }
+            
+            terminal_resize(width, height) => {
+                window_resized(width, height);
+            }
+            
+            copy_selected() => {
+                copy_selected();
+            }
+            
+            paste_clipboard() => {
+                paste_clipboard();
+            }
+        }
+        
+        // 임시 가시적인 LineEdit - 키보드 입력 테스트용
+        LineEdit {
+            height: 30px;
+            placeholder-text: "Type here to test keyboard input...";
+            
+            accepted(text) => {
+                if (text != "") {
+                    terminal_input(text + "\n");
+                    self.text = "";
+                }
+            }
+            
+            edited(text) => {
+                // 실시간 입력은 처리하지 않음 (너무 많은 이벤트 방지)
+            }
+        }
+    }
+}
