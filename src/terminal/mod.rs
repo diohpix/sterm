@@ -1,4 +1,3 @@
-use anyhow::Result;
 use alacritty_terminal::{
     event::{Event, EventListener, Notify, WindowSize},
     event_loop::{EventLoop, Msg, Notifier},
@@ -6,9 +5,10 @@ use alacritty_terminal::{
     index::{Column, Line, Point},
     selection::SelectionRange,
     sync::FairMutex,
-    term::{Term, Config as TermConfig, test::TermSize, TermMode, cell::Cell},
+    term::{cell::Cell, test::TermSize, Config as TermConfig, Term, TermMode},
     tty::{self, Options as TtyOptions, Shell},
 };
+use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -17,7 +17,7 @@ use std::sync::{
 use tokio::sync::Mutex;
 
 use crate::config::Config;
-use crate::utils::color::{ColorTheme, Color};
+use crate::utils::color::{Color, ColorTheme};
 use crate::utils::font::FontMetrics;
 
 static SESSION_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -70,7 +70,7 @@ pub struct ColoredTextSegment {
     pub end_col: usize,
     // UI 렌더링용 절대 위치 (폰트 메트릭으로 계산됨)
     pub x: i32,      // 절대 X 위치 (픽셀)
-    pub y: i32,      // 절대 Y 위치 (픽셀)  
+    pub y: i32,      // 절대 Y 위치 (픽셀)
     pub width: i32,  // 텍스트 폭 (픽셀)
     pub height: i32, // 텍스트 높이 (픽셀)
 }
@@ -123,7 +123,7 @@ impl Default for TerminalSize {
             cell_width: 8,
             cell_height: 16,
             num_cols: 120, // 더 넓게
-            num_lines: 40, // 더 높게  
+            num_lines: 40, // 더 높게
             layout_width: 960.0,
             layout_height: 640.0,
         }
@@ -141,7 +141,7 @@ impl From<TerminalSize> for WindowSize {
     }
 }
 
-// tterm 스타일의 TerminalBackend 
+// tterm 스타일의 TerminalBackend
 pub struct TerminalSession {
     pub id: SessionId,
     pub title: String,
@@ -156,34 +156,40 @@ pub struct TerminalSession {
 
 impl TerminalSession {
     pub fn new(
-        id: SessionId, 
-        shell: &str, 
-        pty_event_proxy_sender: mpsc::Sender<(SessionId, Event)>
+        id: SessionId,
+        shell: &str,
+        pty_event_proxy_sender: mpsc::Sender<(SessionId, Event)>,
     ) -> Result<Self> {
         log::info!("Creating new terminal session {} with shell: {}", id, shell);
-        
+
         // PTY 설정 - tterm 방식
         let pty_config = TtyOptions {
-            shell: Some(Shell::new(shell.to_string(), vec!["-i".to_string(), "-l".to_string()])),
+            shell: Some(Shell::new(
+                shell.to_string(),
+                vec!["-i".to_string(), "-l".to_string()],
+            )),
             working_directory: None,
             env: std::collections::HashMap::new(),
             ..TtyOptions::default()
         };
-        
+
         // Terminal 설정
         let term_config = TermConfig::default();
         let terminal_size = TerminalSize::default();
-        
+
         // EventProxy 생성
         let (event_proxy, event_receiver) = EventProxy::new();
-        
+
         // PTY 생성 (tterm 방식)
         let pty = tty::new(&pty_config, terminal_size.into(), id as u64)?;
-        
+
         // Terminal 생성
-        let term_size = TermSize::new(terminal_size.num_cols as usize, terminal_size.num_lines as usize);
+        let term_size = TermSize::new(
+            terminal_size.num_cols as usize,
+            terminal_size.num_lines as usize,
+        );
         let mut term = Term::new(term_config, &term_size, event_proxy.clone());
-        
+
         // Initial content 생성 (tterm/mterm 방식)
         let initial_content = RenderableContent {
             grid: term.grid().clone(),
@@ -194,9 +200,9 @@ impl TerminalSession {
             cursor_line: 0,
             cursor_col: 0,
         };
-        
+
         let term = Arc::new(FairMutex::new(term));
-        
+
         // EventLoop 생성 및 시작
         let pty_event_loop = EventLoop::new(
             term.clone(),
@@ -205,15 +211,15 @@ impl TerminalSession {
             false, // hold
             false, // ref_test
         )?;
-        
+
         let notifier = Notifier(pty_event_loop.channel());
-        
+
         // EventLoop를 백그라운드에서 실행
         let _pty_event_loop_handle = pty_event_loop.spawn();
-        
+
         let content = Arc::new(Mutex::new(String::new()));
         let is_running = Arc::new(Mutex::new(true));
-        
+
         let session = Self {
             id,
             title: format!("Terminal {}", id + 1),
@@ -225,7 +231,7 @@ impl TerminalSession {
             is_running: is_running.clone(),
             last_content: initial_content,
         };
-        
+
         // PTY 이벤트 구독 스레드 시작 (tterm 방식) - 이벤트 로깅만
         let _pty_event_subscription = std::thread::Builder::new()
             .name(format!("pty_event_subscription_{}", id))
@@ -243,20 +249,23 @@ impl TerminalSession {
             })?;
 
         // 간단한 로그만 출력
-        log::debug!("Terminal session {} setup complete, waiting for PTY data", id);
-        
+        log::debug!(
+            "Terminal session {} setup complete, waiting for PTY data",
+            id
+        );
+
         // 초기 프롬프트 출력을 위해 newline 전송
         session.notifier.notify(b"\n");
 
         log::info!("Terminal session {} created successfully", id);
         Ok(session)
     }
-    
+
     // UI 콜백 설정
     pub fn set_ui_callback(&mut self, callback: Arc<UIUpdateCallback>) {
         self.ui_callback = Some(callback);
     }
-    
+
     /// Sync terminal state and return renderable content (from tterm/mterm)
     pub fn sync(&mut self) -> &RenderableContent {
         let term = self.term.clone();
@@ -278,43 +287,46 @@ impl TerminalSession {
         self.last_content.cursor_col = point.column.0 as usize;
         &self.last_content
     }
-    
+
     /// Extract text from terminal grid
     pub fn extract_terminal_text(&mut self) -> String {
         let content = self.sync();
         let grid = &content.grid;
         let mut result = String::new();
-        
+
         // Grid를 순회해서 텍스트 추출 (alacritty 방식)
         for indexed in grid.display_iter() {
             let cell = indexed.cell;
             let ch = cell.c;
-            
+
             // 줄바꿈 처리
             if indexed.point.column.0 == 0 && indexed.point.line.0 > 0 {
                 result.push('\n');
             }
-            
+
             // 문자 추가 (공백이 아닌 경우만)
             if ch != ' ' || result.chars().last() != Some(' ') {
                 result.push(ch);
             }
         }
-        
+
         // 끝의 빈 줄들 제거
         result.trim_end().to_string()
     }
-    
+
     /// Extract text with color information from terminal grid
-    pub fn extract_colored_terminal_content(&mut self, font_metrics: &FontMetrics) -> ColoredTerminalContent {
+    pub fn extract_colored_terminal_content(
+        &mut self,
+        font_metrics: &FontMetrics,
+    ) -> ColoredTerminalContent {
         let session_id = self.id; // Copy id first to avoid borrow issues
         let content = self.sync();
         let grid = &content.grid;
         let theme = ColorTheme::default();
         let mut segments = Vec::new();
-        
+
         log::debug!("Starting color extraction for session {}", session_id);
-        
+
         // display_iter()를 사용해서 실제 색상 정보 추출하되 줄별로 정리
         let mut current_line = 0;
         let mut line_text = String::new();
@@ -323,28 +335,38 @@ impl TerminalSession {
         let mut current_fg = theme.foreground;
         let mut current_bg = theme.background;
         let mut segment_start_col = 0;
-        let mut accumulated_x_by_line: std::collections::HashMap<usize, i32> = std::collections::HashMap::new();
-        
+        let mut accumulated_x_by_line: std::collections::HashMap<usize, i32> =
+            std::collections::HashMap::new();
+
         for indexed in grid.display_iter() {
             let cell = indexed.cell;
             let ch = cell.c;
             let line_num = indexed.point.line.0 as usize;
             let _col_num = indexed.point.column.0 as usize;
-            
+
             // Skip wide char spacers
-            if cell.flags.contains(alacritty_terminal::term::cell::Flags::WIDE_CHAR_SPACER) {
+            if cell
+                .flags
+                .contains(alacritty_terminal::term::cell::Flags::WIDE_CHAR_SPACER)
+            {
                 continue;
             }
-            
+
             // Get actual colors from indexed cell
             let mut fg_color = theme.convert_ansi_color(&indexed.fg);
             let mut bg_color = theme.convert_ansi_color(&indexed.bg);
-            
+
             // Apply cell flags
-            if cell.flags.contains(alacritty_terminal::term::cell::Flags::INVERSE) {
+            if cell
+                .flags
+                .contains(alacritty_terminal::term::cell::Flags::INVERSE)
+            {
                 std::mem::swap(&mut fg_color, &mut bg_color);
             }
-            if cell.flags.intersects(alacritty_terminal::term::cell::Flags::DIM | alacritty_terminal::term::cell::Flags::DIM_BOLD) {
+            if cell.flags.intersects(
+                alacritty_terminal::term::cell::Flags::DIM
+                    | alacritty_terminal::term::cell::Flags::DIM_BOLD,
+            ) {
                 fg_color = Color {
                     r: ((fg_color.r as f32) * 0.7) as u8,
                     g: ((fg_color.g as f32) * 0.7) as u8,
@@ -352,16 +374,18 @@ impl TerminalSession {
                     a: fg_color.a,
                 };
             }
-            
+
             // 새 줄이 시작되면 이전 줄 처리
             if line_num != current_line {
                 // 이전 줄의 마지막 세그먼트 추가
                 if !current_segment_text.is_empty() {
                     let current_line_x = accumulated_x_by_line.get(&current_line).unwrap_or(&0);
-                    let text_width = (current_segment_text.chars().count() as i32) * font_metrics.char_width;
+                    let text_width =
+                        (current_segment_text.chars().count() as i32) * font_metrics.char_width;
                     let abs_x = font_metrics.padding_x + current_line_x;
-                    let abs_y = font_metrics.padding_y + (current_line as i32) * font_metrics.line_height;
-                    
+                    let abs_y =
+                        font_metrics.padding_y + (current_line as i32) * font_metrics.line_height;
+
                     line_segments.push(ColoredTextSegment {
                         text: current_segment_text.clone(),
                         fg_color: current_fg,
@@ -374,14 +398,14 @@ impl TerminalSession {
                         width: text_width,
                         height: font_metrics.line_height,
                     });
-                    
+
                     // 누적 X 위치 업데이트
                     accumulated_x_by_line.insert(current_line, current_line_x + text_width);
                 }
-                
+
                 // 줄별 세그먼트들을 메인 리스트에 추가
                 segments.extend(line_segments.clone());
-                
+
                 // 새 줄 초기화
                 current_line = line_num;
                 line_text.clear();
@@ -391,18 +415,24 @@ impl TerminalSession {
                 current_fg = fg_color;
                 current_bg = bg_color;
             }
-            
+
             // 색상이 변경되면 새 세그먼트 시작
-            let colors_changed = fg_color.r != current_fg.r || fg_color.g != current_fg.g || fg_color.b != current_fg.b ||
-                               bg_color.r != current_bg.r || bg_color.g != current_bg.g || bg_color.b != current_bg.b;
-            
+            let colors_changed = fg_color.r != current_fg.r
+                || fg_color.g != current_fg.g
+                || fg_color.b != current_fg.b
+                || bg_color.r != current_bg.r
+                || bg_color.g != current_bg.g
+                || bg_color.b != current_bg.b;
+
             if colors_changed && !current_segment_text.is_empty() {
                 // 현재 세그먼트 저장 (절대 위치 계산 포함)
                 let current_line_x = accumulated_x_by_line.get(&current_line).unwrap_or(&0);
-                let text_width = (current_segment_text.chars().count() as i32) * font_metrics.char_width;
+                let text_width =
+                    (current_segment_text.chars().count() as i32) * font_metrics.char_width;
                 let abs_x = font_metrics.padding_x + current_line_x;
-                let abs_y = font_metrics.padding_y + (current_line as i32) * font_metrics.line_height;
-                
+                let abs_y =
+                    font_metrics.padding_y + (current_line as i32) * font_metrics.line_height;
+
                 line_segments.push(ColoredTextSegment {
                     text: current_segment_text.clone(),
                     fg_color: current_fg,
@@ -415,22 +445,22 @@ impl TerminalSession {
                     width: text_width,
                     height: font_metrics.line_height,
                 });
-                
+
                 // 누적 X 위치 업데이트
                 accumulated_x_by_line.insert(current_line, current_line_x + text_width);
-                
+
                 // 새 세그먼트 시작
                 segment_start_col += current_segment_text.chars().count();
                 current_segment_text.clear();
                 current_fg = fg_color;
                 current_bg = bg_color;
             }
-            
+
             // 문자 추가
             current_segment_text.push(ch);
             line_text.push(ch);
         }
-        
+
         // 마지막 세그먼트 처리 (절대 위치 계산 포함)
         if !current_segment_text.is_empty() {
             let text_len = current_segment_text.chars().count();
@@ -438,7 +468,7 @@ impl TerminalSession {
             let text_width = (text_len as i32) * font_metrics.char_width;
             let abs_x = font_metrics.padding_x + current_line_x;
             let abs_y = font_metrics.padding_y + (current_line as i32) * font_metrics.line_height;
-            
+
             line_segments.push(ColoredTextSegment {
                 text: current_segment_text,
                 fg_color: current_fg,
@@ -453,9 +483,13 @@ impl TerminalSession {
             });
         }
         segments.extend(line_segments);
-        
-        log::debug!("Color extraction completed for session {}. Total segments: {}", session_id, segments.len());
-        
+
+        log::debug!(
+            "Color extraction completed for session {}. Total segments: {}",
+            session_id,
+            segments.len()
+        );
+
         // 생성된 세그먼트들을 자세히 디버그 출력
         for (i, seg) in segments.iter().enumerate() {
             let text_preview = if seg.text.len() > 30 {
@@ -463,16 +497,23 @@ impl TerminalSession {
             } else {
                 seg.text.clone()
             };
-            let text_escaped = text_preview.replace('\n', "\\n").replace('\r', "\\r").replace('\t', "\\t");
-            log::debug!("🎨 Generated Segment[{}]: text='{}' len={} line={} x={} y={} w={} h={}", 
-                i, 
+            let text_escaped = text_preview
+                .replace('\n', "\\n")
+                .replace('\r', "\\r")
+                .replace('\t', "\\t");
+            log::debug!(
+                "🎨 Generated Segment[{}]: text='{}' len={} line={} x={} y={} w={} h={}",
+                i,
                 text_escaped,
                 seg.text.len(),
                 seg.line,
-                seg.x, seg.y, seg.width, seg.height
+                seg.x,
+                seg.y,
+                seg.width,
+                seg.height
             );
         }
-        
+
         ColoredTerminalContent {
             segments,
             cursor_line: content.cursor_line,
@@ -481,7 +522,7 @@ impl TerminalSession {
             total_cols: grid.columns(),
         }
     }
-    
+
     // tterm 방식의 write - Notifier 사용
     pub fn write(&self, data: &str) -> Result<()> {
         log::debug!("Writing to PTY (session {}): {:?}", self.id, data);
@@ -492,21 +533,21 @@ impl TerminalSession {
     // tterm 방식의 resize
     pub fn resize(&mut self, cols: u16, rows: u16) -> Result<()> {
         log::info!("Resizing session {} to {}x{}", self.id, cols, rows);
-        
+
         // 터미널 크기 업데이트
         self.size.num_cols = cols;
         self.size.num_lines = rows;
         self.size.layout_width = cols as f32 * self.size.cell_width as f32;
         self.size.layout_height = rows as f32 * self.size.cell_height as f32;
-        
+
         // PTY에 리사이즈 알림
         let window_size: WindowSize = self.size.into();
         self.notifier.0.send(Msg::Resize(window_size))?;
-        
+
         // Term에도 리사이즈 알림
         let mut term = self.term.lock();
         term.resize(TermSize::new(cols as usize, rows as usize));
-        
+
         Ok(())
     }
 
@@ -519,13 +560,11 @@ impl TerminalSession {
         *running
     }
 
-
-
     pub async fn stop(&self) {
         log::info!("Stopping terminal session {}", self.id);
         let mut running = self.is_running.lock().await;
         *running = false;
-        
+
         // PTY에 종료 신호 전송
         let _ = self.notifier.0.send(Msg::Shutdown);
     }
@@ -552,26 +591,26 @@ impl TerminalManager {
             pty_event_receiver: Some(pty_event_receiver),
         })
     }
-    
+
     pub fn set_ui_update_callback(&mut self, callback: UIUpdateCallback) {
         self.ui_callback = Some(Arc::new(callback));
     }
-    
+
     pub fn take_pty_event_receiver(&mut self) -> Option<mpsc::Receiver<(SessionId, Event)>> {
         self.pty_event_receiver.take()
     }
-    
+
     pub async fn process_pty_event(&mut self, session_id: SessionId, event: Event) {
         match event {
             Event::PtyWrite(data) => {
                 let text = String::from_utf8_lossy(data.as_bytes());
                 log::debug!("PTY output for session {}: {:?}", session_id, text);
-                
+
                 // 해당 세션의 콘텐츠 업데이트
                 if let Some(session) = self.sessions.get(&session_id) {
                     let mut content_guard = session.content.lock().await;
                     content_guard.push_str(&text);
-                    
+
                     // 스크롤백 관리
                     if content_guard.len() > 50000 {
                         let split_pos = content_guard.len() - 40000;
@@ -579,7 +618,7 @@ impl TerminalManager {
                             content_guard.drain(0..split_pos + newline_pos + 1);
                         }
                     }
-                    
+
                     // UI 업데이트 콜백 호출
                     if let Some(callback) = &self.ui_callback {
                         callback(session_id, content_guard.clone());
@@ -587,7 +626,11 @@ impl TerminalManager {
                 }
             }
             Event::Title(title) => {
-                log::debug!("Terminal title changed for session {}: {}", session_id, title);
+                log::debug!(
+                    "Terminal title changed for session {}: {}",
+                    session_id,
+                    title
+                );
             }
             Event::Exit => {
                 log::info!("Terminal session {} exited", session_id);
@@ -601,18 +644,18 @@ impl TerminalManager {
             }
         }
     }
-    
+
     pub fn process_pty_event_sync(&self, session_id: SessionId, event: Event) {
         match event {
             Event::PtyWrite(data) => {
                 let text = String::from_utf8_lossy(data.as_bytes());
                 log::debug!("PTY output for session {} (sync): {:?}", session_id, text);
-                
+
                 // 해당 세션의 콘텐츠 업데이트
                 if let Some(session) = self.sessions.get(&session_id) {
                     if let Ok(mut content_guard) = session.content.try_lock() {
                         content_guard.push_str(&text);
-                        
+
                         // 스크롤백 관리
                         if content_guard.len() > 50000 {
                             let split_pos = content_guard.len() - 40000;
@@ -620,7 +663,7 @@ impl TerminalManager {
                                 content_guard.drain(0..split_pos + newline_pos + 1);
                             }
                         }
-                        
+
                         // UI 업데이트 콜백 호출
                         if let Some(callback) = &self.ui_callback {
                             callback(session_id, content_guard.clone());
@@ -629,7 +672,11 @@ impl TerminalManager {
                 }
             }
             Event::Title(title) => {
-                log::debug!("Terminal title changed for session {}: {}", session_id, title);
+                log::debug!(
+                    "Terminal title changed for session {}: {}",
+                    session_id,
+                    title
+                );
             }
             Event::Exit => {
                 log::info!("Terminal session {} exited", session_id);
@@ -644,12 +691,16 @@ impl TerminalManager {
             }
         }
     }
-    
-    pub fn update_session_content_and_get(&self, session_id: SessionId, text: &str) -> Option<String> {
+
+    pub fn update_session_content_and_get(
+        &self,
+        session_id: SessionId,
+        text: &str,
+    ) -> Option<String> {
         if let Some(session) = self.sessions.get(&session_id) {
             if let Ok(mut content_guard) = session.content.try_lock() {
                 content_guard.push_str(text);
-                
+
                 // 스크롤백 관리
                 if content_guard.len() > 50000 {
                     let split_pos = content_guard.len() - 40000;
@@ -657,13 +708,13 @@ impl TerminalManager {
                         content_guard.drain(0..split_pos + newline_pos + 1);
                     }
                 }
-                
+
                 return Some(content_guard.clone());
             }
         }
         None
     }
-    
+
     /// Extract terminal text from session (for UI updates)
     pub fn extract_session_terminal_text(&mut self, session_id: SessionId) -> Option<String> {
         if let Some(session) = self.sessions.get_mut(&session_id) {
@@ -672,8 +723,12 @@ impl TerminalManager {
             None
         }
     }
-    
-    pub fn extract_session_colored_content(&mut self, session_id: SessionId, font_metrics: &FontMetrics) -> Option<ColoredTerminalContent> {
+
+    pub fn extract_session_colored_content(
+        &mut self,
+        session_id: SessionId,
+        font_metrics: &FontMetrics,
+    ) -> Option<ColoredTerminalContent> {
         if let Some(session) = self.sessions.get_mut(&session_id) {
             Some(session.extract_colored_terminal_content(font_metrics))
         } else {
@@ -683,20 +738,20 @@ impl TerminalManager {
 
     pub fn create_new_session(&mut self) -> Result<SessionId> {
         let session_id = SESSION_ID_COUNTER.fetch_add(1, Ordering::SeqCst);
-        
+
         let mut session = TerminalSession::new(
-            session_id, 
+            session_id,
             &self.config.terminal.shell,
-            self.pty_event_sender.clone()
+            self.pty_event_sender.clone(),
         )?;
-        
+
         // UI 콜백 설정
         if let Some(callback) = &self.ui_callback {
             session.set_ui_callback(callback.clone());
         }
-        
+
         self.sessions.insert(session_id, session);
-        
+
         if self.active_session.is_none() {
             self.active_session = Some(session_id);
         }
@@ -714,8 +769,7 @@ impl TerminalManager {
     }
 
     pub fn get_active_session(&self) -> Option<&TerminalSession> {
-        self.active_session
-            .and_then(|id| self.sessions.get(&id))
+        self.active_session.and_then(|id| self.sessions.get(&id))
     }
 
     pub fn set_active_session(&mut self, session_id: SessionId) -> Result<()> {
@@ -731,7 +785,7 @@ impl TerminalManager {
     pub async fn close_session(&mut self, session_id: SessionId) -> Result<()> {
         if let Some(session) = self.sessions.remove(&session_id) {
             session.stop().await;
-            
+
             // 세션이 현재 활성 세션인 경우 다른 세션으로 전환
             if self.active_session == Some(session_id) {
                 self.active_session = self.sessions.keys().next().copied();
@@ -770,18 +824,16 @@ impl TerminalManager {
             None
         }
     }
-    
-
 
     pub async fn cleanup_dead_sessions(&mut self) {
         let mut dead_sessions = Vec::new();
-        
+
         for (id, session) in &self.sessions {
             if !session.is_alive().await {
                 dead_sessions.push(*id);
             }
         }
-        
+
         for id in dead_sessions {
             let _ = self.close_session(id).await;
         }

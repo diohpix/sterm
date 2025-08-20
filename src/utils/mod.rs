@@ -11,9 +11,9 @@ pub use platform::*;
 
 /// 애플리케이션 데이터 디렉토리를 반환합니다.
 pub fn get_app_data_dir() -> Result<PathBuf> {
-    let home_dir = dirs::home_dir()
-        .ok_or_else(|| anyhow::anyhow!("Could not find home directory"))?;
-    
+    let home_dir =
+        dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Could not find home directory"))?;
+
     Ok(home_dir.join(".config").join("sterm"))
 }
 
@@ -32,19 +32,19 @@ pub fn is_valid_color(color: &str) -> bool {
 pub fn format_bytes(bytes: u64) -> String {
     const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
     const THRESHOLD: f64 = 1024.0;
-    
+
     if bytes == 0 {
         return "0 B".to_string();
     }
-    
+
     let mut size = bytes as f64;
     let mut unit_index = 0;
-    
+
     while size >= THRESHOLD && unit_index < UNITS.len() - 1 {
         size /= THRESHOLD;
         unit_index += 1;
     }
-    
+
     if unit_index == 0 {
         format!("{:.0} {}", size, UNITS[unit_index])
     } else {
@@ -62,12 +62,12 @@ pub fn safe_truncate(s: &str, max_len: usize) -> &str {
     if s.len() <= max_len {
         return s;
     }
-    
+
     let mut end = max_len;
     while end > 0 && !s.is_char_boundary(end) {
         end -= 1;
     }
-    
+
     &s[..end]
 }
 

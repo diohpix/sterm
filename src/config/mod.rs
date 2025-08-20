@@ -77,7 +77,7 @@ impl Default for Config {
 impl Config {
     pub async fn load() -> Result<Self> {
         let config_path = Self::config_file_path()?;
-        
+
         if config_path.exists() {
             let content = fs::read_to_string(&config_path).await?;
             let config: Config = toml::from_str(&content)?;
@@ -91,21 +91,21 @@ impl Config {
 
     pub async fn save(&self) -> Result<()> {
         let config_path = Self::config_file_path()?;
-        
+
         if let Some(parent) = config_path.parent() {
             fs::create_dir_all(parent).await?;
         }
-        
+
         let content = toml::to_string_pretty(self)?;
         fs::write(&config_path, content).await?;
-        
+
         Ok(())
     }
 
     fn config_file_path() -> Result<PathBuf> {
-        let home_dir = dirs::home_dir()
-            .ok_or_else(|| anyhow::anyhow!("Could not find home directory"))?;
-        
+        let home_dir =
+            dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Could not find home directory"))?;
+
         Ok(home_dir.join(".config").join("sterm").join("config.toml"))
     }
 

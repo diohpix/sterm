@@ -108,6 +108,7 @@ export component TerminalView inherits Rectangle {
     in-out property <string> selected_text: "";
     
     callback terminal_input(string);
+    callback terminal_key_event(/* key_code */ int, /* modifiers */ int, /* text */ string);
     callback terminal_resize(int, int);
     callback copy_selected();
     callback paste_clipboard();
@@ -176,26 +177,24 @@ export component TerminalView inherits Rectangle {
         }
     }
     
-    // 숨겨진 LineEdit으로 키보드 입력 처리
-    LineEdit {
-        x: -1000px;
-        y: -1000px;
-        width: 1px;
-        height: 1px;
-        opacity: 0.01;
+    // 키보드 입력을 받기 위한 포커스 가능한 Rectangle
+    terminal_focus := FocusScope {
+        x: 0;
+        y: 0;
+        width: 100%;
+        height: 100%;
         
-        accepted(text) => {
-            if (text != "") {
-                terminal_input(text + "\n"); // Enter key pressed
-                self.text = "";
+        key-pressed(event) => {
+            // 기본적인 키 이벤트 처리
+            if (event.text != "") {
+                terminal_input(event.text);
             }
+            accept
         }
         
-        edited(text) => {
-            if (text != "") {
-                terminal_input(text);
-                self.text = "";
-            }
+        key-released(event) => {
+            // 필요한 경우 키 릴리즈 처리
+            accept
         }
     }
     
@@ -209,12 +208,12 @@ export component TerminalView inherits Rectangle {
         property <float> current_x: 0;
         property <float> current_y: 0;
         
-        // 마우스 누름 - 텍스트 입력에 포커스 설정
+        // 마우스 누름 - 키보드 입력에 포커스 설정
         clicked => {
             // 단순 클릭으로는 선택 해제
             has_selection = false;
-            // 숨겨진 텍스트 입력에 포커스 설정 (키보드 입력을 받기 위해)
-            // TODO: 포커스 설정 방법 개선 필요
+            // 터미널 키보드 입력에 포커스 설정
+            terminal_focus.focus();
         }
         
         // 더블클릭으로 단어 선택
@@ -257,6 +256,7 @@ export component MainWindow inherits Window {
     callback new_tab_clicked();
     callback close_tab_clicked(int);
     callback terminal_input(string);
+    callback terminal_key_event(/* key_code */ int, /* modifiers */ int, /* text */ string);
     callback window_resized(int, int);
     callback copy_selected();
     callback paste_clipboard();
@@ -291,6 +291,10 @@ export component MainWindow inherits Window {
                 terminal_input(text);
             }
             
+            terminal_key_event(key_code, modifiers, text) => {
+                terminal_key_event(key_code, modifiers, text);
+            }
+            
             terminal_resize(width, height) => {
                 window_resized(width, height);
             }
@@ -301,23 +305,6 @@ export component MainWindow inherits Window {
             
             paste_clipboard() => {
                 paste_clipboard();
-            }
-        }
-        
-        // 임시 가시적인 LineEdit - 키보드 입력 테스트용
-        LineEdit {
-            height: 30px;
-            placeholder-text: "Type here to test keyboard input...";
-            
-            accepted(text) => {
-                if (text != "") {
-                    terminal_input(text + "\n");
-                    self.text = "";
-                }
-            }
-            
-            edited(text) => {
-                // 실시간 입력은 처리하지 않음 (너무 많은 이벤트 방지)
             }
         }
     }

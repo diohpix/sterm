@@ -61,7 +61,7 @@ impl Platform {
     pub fn copy_to_clipboard(text: &str) -> Result<()> {
         #[cfg(target_os = "macos")]
         return macos::copy_to_clipboard(text);
-        
+
         #[cfg(not(target_os = "macos"))]
         {
             // 다른 플랫폼에서는 기본 구현
@@ -74,7 +74,7 @@ impl Platform {
     pub fn paste_from_clipboard() -> Result<String> {
         #[cfg(target_os = "macos")]
         return macos::paste_from_clipboard();
-        
+
         #[cfg(not(target_os = "macos"))]
         {
             // 다른 플랫폼에서는 기본 구현
@@ -87,7 +87,7 @@ impl Platform {
     pub fn show_notification(title: &str, message: &str) -> Result<()> {
         #[cfg(target_os = "macos")]
         return macos::show_notification(title, message);
-        
+
         #[cfg(not(target_os = "macos"))]
         {
             log::info!("Notification: {} - {}", title, message);
@@ -99,7 +99,7 @@ impl Platform {
     pub fn is_dark_mode() -> bool {
         #[cfg(target_os = "macos")]
         return macos::is_dark_mode();
-        
+
         #[cfg(not(target_os = "macos"))]
         false
     }
@@ -114,19 +114,19 @@ mod macos {
         let mut child = Command::new("pbcopy")
             .stdin(std::process::Stdio::piped())
             .spawn()?;
-        
+
         if let Some(stdin) = child.stdin.as_mut() {
             use std::io::Write;
             stdin.write_all(text.as_bytes())?;
         }
-        
+
         child.wait()?;
         Ok(())
     }
 
     pub fn paste_from_clipboard() -> Result<String> {
         let output = Command::new("pbpaste").output()?;
-        
+
         if output.status.success() {
             Ok(String::from_utf8(output.stdout)?)
         } else {
@@ -142,7 +142,7 @@ mod macos {
                 message, title
             ))
             .spawn()?;
-        
+
         Ok(())
     }
 
@@ -150,14 +150,14 @@ mod macos {
         let output = Command::new("defaults")
             .args(&["read", "-g", "AppleInterfaceStyle"])
             .output();
-        
+
         if let Ok(output) = output {
             if output.status.success() {
                 let style = String::from_utf8_lossy(&output.stdout);
                 return style.trim() == "Dark";
             }
         }
-        
+
         false
     }
 }
@@ -188,23 +188,21 @@ impl SystemInfo {
             let output = std::process::Command::new("sw_vers")
                 .arg("-productVersion")
                 .output()?;
-            
+
             if output.status.success() {
                 Ok(String::from_utf8(output.stdout)?.trim().to_string())
             } else {
                 Ok("Unknown".to_string())
             }
         }
-        
+
         #[cfg(not(target_os = "macos"))]
         Ok("Unknown".to_string())
     }
 
     fn get_kernel_version() -> Result<String> {
-        let output = std::process::Command::new("uname")
-            .arg("-r")
-            .output()?;
-        
+        let output = std::process::Command::new("uname").arg("-r").output()?;
+
         if output.status.success() {
             Ok(String::from_utf8(output.stdout)?.trim().to_string())
         } else {

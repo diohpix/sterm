@@ -1,5 +1,5 @@
-use anyhow::Result;
 use alacritty_terminal::vte::ansi::{self, NamedColor};
+use anyhow::Result;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Color {
@@ -20,15 +20,15 @@ impl Color {
 
     pub fn from_hex(hex: &str) -> Result<Self> {
         let hex = hex.trim_start_matches('#');
-        
+
         if hex.len() != 6 {
             return Err(anyhow::anyhow!("Invalid hex color format: {}", hex));
         }
-        
+
         let r = u8::from_str_radix(&hex[0..2], 16)?;
         let g = u8::from_str_radix(&hex[2..4], 16)?;
         let b = u8::from_str_radix(&hex[4..6], 16)?;
-        
+
         Ok(Self::rgb(r, g, b))
     }
 
@@ -47,7 +47,7 @@ impl Color {
     pub fn blend(&self, other: &Color, alpha: f32) -> Self {
         let alpha = alpha.clamp(0.0, 1.0);
         let inv_alpha = 1.0 - alpha;
-        
+
         Self::new(
             ((self.r as f32 * inv_alpha) + (other.r as f32 * alpha)) as u8,
             ((self.g as f32 * inv_alpha) + (other.g as f32 * alpha)) as u8,
@@ -158,20 +158,16 @@ impl ColorTheme {
             _ => self.foreground,
         }
     }
-    
+
     /// Convert alacritty's Color to our Color
     pub fn convert_ansi_color(&self, color: &ansi::Color) -> Color {
         match color {
-            ansi::Color::Named(named_color) => {
-                self.get_named_color(named_color)
-            }
+            ansi::Color::Named(named_color) => self.get_named_color(named_color),
             ansi::Color::Spec(rgb) => Color::rgb(rgb.r, rgb.g, rgb.b),
-            ansi::Color::Indexed(indexed_color) => {
-                self.get_indexed_color(*indexed_color)
-            }
+            ansi::Color::Indexed(indexed_color) => self.get_indexed_color(*indexed_color),
         }
     }
-    
+
     fn get_named_color(&self, named_color: &NamedColor) -> Color {
         match named_color {
             NamedColor::Foreground => self.foreground,
@@ -205,7 +201,7 @@ impl ColorTheme {
             NamedColor::Cursor => self.cursor,
         }
     }
-    
+
     fn get_indexed_color(&self, index: u8) -> Color {
         match index {
             0..=15 => self.get_ansi_color(index),
@@ -215,11 +211,11 @@ impl ColorTheme {
                 let r = (index / 36) % 6;
                 let g = (index / 6) % 6;
                 let b = index % 6;
-                
+
                 let r = if r == 0 { 0 } else { 55 + r * 40 };
                 let g = if g == 0 { 0 } else { 55 + g * 40 };
                 let b = if b == 0 { 0 } else { 55 + b * 40 };
-                
+
                 Color::rgb(r, g, b)
             }
             232..=255 => {

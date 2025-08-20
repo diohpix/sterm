@@ -1,19 +1,156 @@
 use anyhow::Result;
-use slint::{Weak, VecModel, ModelRc, Model};
-use std::sync::Arc;
+use slint::{Model, ModelRc, VecModel, Weak};
 use std::sync::mpsc;
+use std::sync::Arc;
 // Duration import removed - no longer using timers
 use tokio::sync::Mutex;
 
 use crate::terminal::{SessionId, TerminalManager};
 use crate::utils::font::FontMetrics;
-use crate::{MainWindow, ColorSegment, CursorInfo};
+use crate::{ColorSegment, CursorInfo, MainWindow};
+
+// 터미널 키 코드 상수들 (Slint의 키 코드와 대응)
+const KEY_BACKSPACE: i32 = 8;
+const KEY_TAB: i32 = 9;
+const KEY_ENTER: i32 = 10;
+const KEY_ESCAPE: i32 = 27;
+const KEY_DELETE: i32 = 127;
+const KEY_UP: i32 = 38;
+const KEY_DOWN: i32 = 40;
+const KEY_LEFT: i32 = 37;
+const KEY_RIGHT: i32 = 39;
+const KEY_HOME: i32 = 36;
+const KEY_END: i32 = 35;
+const KEY_PAGE_UP: i32 = 33;
+const KEY_PAGE_DOWN: i32 = 34;
+
+// Modifier 플래그 상수들
+const MODIFIER_SHIFT: i32 = 1;
+const MODIFIER_CTRL: i32 = 2;
+const MODIFIER_ALT: i32 = 4;
+const MODIFIER_META: i32 = 8;
+
+/// 키 이벤트를 터미널 시퀀스로 변환
+fn process_key_event(key_code: i32, modifiers: i32, text: &str) -> String {
+    let ctrl_pressed = (modifiers & MODIFIER_CTRL) != 0;
+    let alt_pressed = (modifiers & MODIFIER_ALT) != 0;
+    let shift_pressed = (modifiers & MODIFIER_SHIFT) != 0;
+    
+    log::debug!("Processing key: code={}, modifiers={}, ctrl={}, alt={}, shift={}, text='{}'", 
+                key_code, modifiers, ctrl_pressed, alt_pressed, shift_pressed, text);
+
+    // Ctrl 조합 키들
+    if ctrl_pressed {
+        match key_code {
+            // Ctrl+A ~ Ctrl+Z (ASCII 1-26)
+            65..=90 => {  // A-Z
+                let ctrl_char = (key_code - 64) as u8;
+                return String::from_utf8_lossy(&[ctrl_char]).to_string();
+            }
+            97..=122 => { // a-z
+                let ctrl_char = (key_code - 96) as u8;
+                return String::from_utf8_lossy(&[ctrl_char]).to_string();
+            }
+            KEY_ENTER => return "\n".to_string(),
+            _ => {}
+        }
+    }
+
+    // 특수 키들
+    match key_code {
+        KEY_BACKSPACE => "\x08".to_string(), // Backspace
+        KEY_TAB => {
+            if shift_pressed {
+                "\x1b[Z".to_string() // Shift+Tab
+            } else {
+                "\t".to_string() // Tab
+            }
+        },
+        KEY_ENTER => "\n".to_string(),
+        KEY_ESCAPE => "\x1b".to_string(),
+        KEY_DELETE => "\x7f".to_string(),
+        
+        // 방향키들 (ANSI escape sequences)
+        KEY_UP => {
+            if ctrl_pressed {
+                "\x1b[1;5A".to_string() // Ctrl+Up
+            } else if alt_pressed {
+                "\x1b[1;3A".to_string() // Alt+Up
+            } else {
+                "\x1b[A".to_string() // Up
+            }
+        },
+        KEY_DOWN => {
+            if ctrl_pressed {
+                "\x1b[1;5B".to_string() // Ctrl+Down
+            } else if alt_pressed {
+                "\x1b[1;3B".to_string() // Alt+Down
+            } else {
+                "\x1b[B".to_string() // Down
+            }
+        },
+        KEY_RIGHT => {
+            if ctrl_pressed {
+                "\x1b[1;5C".to_string() // Ctrl+Right
+            } else if alt_pressed {
+                "\x1b[1;3C".to_string() // Alt+Right
+            } else {
+                "\x1b[C".to_string() // Right
+            }
+        },
+        KEY_LEFT => {
+            if ctrl_pressed {
+                "\x1b[1;5D".to_string() // Ctrl+Left
+            } else if alt_pressed {
+                "\x1b[1;3D".to_string() // Alt+Left
+            } else {
+                "\x1b[D".to_string() // Left
+            }
+        },
+        
+        KEY_HOME => {
+            if ctrl_pressed {
+                "\x1b[1;5H".to_string()
+            } else {
+                "\x1b[H".to_string()
+            }
+        },
+        KEY_END => {
+            if ctrl_pressed {
+                "\x1b[1;5F".to_string()
+            } else {
+                "\x1b[F".to_string()
+            }
+        },
+        KEY_PAGE_UP => "\x1b[5~".to_string(),
+        KEY_PAGE_DOWN => "\x1b[6~".to_string(),
+        
+        _ => {
+            // 일반 문자 입력의 경우 text를 사용
+            if !text.is_empty() {
+                if alt_pressed {
+                    // Alt+문자의 경우 ESC prefix 추가
+                    format!("\x1b{}", text)
+                } else {
+                    text.to_string()
+                }
+            } else {
+                String::new()
+            }
+        }
+    }
+}
 
 // UI 업데이트 메시지 타입
 #[derive(Debug, Clone)]
 pub enum UIUpdateMessage {
-    ColoredTerminalContent { session_id: SessionId, segments: Vec<crate::terminal::ColoredTextSegment> },
-    SessionClosed { session_id: SessionId },
+    ColoredTerminalContent {
+        session_id: SessionId,
+        segments: Vec<crate::terminal::ColoredTextSegment>,
+    },
+    SessionClosed {
+        session_id: SessionId,
+    },
 }
 
 pub struct UIManager {
@@ -36,7 +173,7 @@ impl UIManager {
             ui_update_receiver: Some(ui_update_receiver),
         })
     }
-    
+
     /// 색상 세그먼트들을 렌더링 가능한 텍스트로 변환
     fn render_colored_segments(segments: &[crate::terminal::ColoredTextSegment]) -> String {
         // TODO: 실제 색상 렌더링 구현
@@ -49,24 +186,25 @@ impl UIManager {
     }
 
     pub async fn setup_event_handlers(&mut self) -> Result<()> {
-        let window = self.window.upgrade().ok_or_else(|| {
-            anyhow::anyhow!("Failed to upgrade window weak reference")
-        })?;
+        let window = self
+            .window
+            .upgrade()
+            .ok_or_else(|| anyhow::anyhow!("Failed to upgrade window weak reference"))?;
 
         // 탭 클릭 이벤트 핸들러
         {
             let terminal_manager = self.terminal_manager.clone();
             let window_weak = self.window.clone();
-            
+
             window.on_tab_clicked(move |tab_id| {
                 let terminal_manager = terminal_manager.clone();
                 let window_weak = window_weak.clone();
-                
+
                 // 메인 스레드에서 비동기 작업 실행
                 slint::invoke_from_event_loop(move || {
                     let terminal_manager = terminal_manager.clone();
                     let window_weak = window_weak.clone();
-                    
+
                     tokio::spawn(async move {
                         let mut tm = terminal_manager.lock().await;
                         if let Err(e) = tm.set_active_session(tab_id as SessionId) {
@@ -74,16 +212,18 @@ impl UIManager {
                             return;
                         }
                         drop(tm);
-                        
+
                         // UI 업데이트는 다시 메인 스레드로
                         slint::invoke_from_event_loop(move || {
                             if let Some(window) = window_weak.upgrade() {
                                 window.set_active_tab(tab_id);
                                 // 터미널 내용 업데이트는 타이머로 처리됨
                             }
-                        }).unwrap_or_else(|e| log::error!("Failed to invoke UI update: {:?}", e));
+                        })
+                        .unwrap_or_else(|e| log::error!("Failed to invoke UI update: {:?}", e));
                     });
-                }).unwrap_or_else(|e| log::error!("Failed to invoke from event loop: {:?}", e));
+                })
+                .unwrap_or_else(|e| log::error!("Failed to invoke from event loop: {:?}", e));
             });
         }
 
@@ -91,11 +231,11 @@ impl UIManager {
         {
             let terminal_manager = self.terminal_manager.clone();
             let window_weak = self.window.clone();
-            
+
             window.on_new_tab_clicked(move || {
                 let terminal_manager = terminal_manager.clone();
                 let window_weak = window_weak.clone();
-                
+
                 slint::invoke_from_event_loop(move || {
                     tokio::spawn(async move {
                         let mut tm = terminal_manager.lock().await;
@@ -104,17 +244,25 @@ impl UIManager {
                                 // UI 업데이트
                                 slint::invoke_from_event_loop(move || {
                                     if let Some(window) = window_weak.upgrade() {
-                                        Self::add_tab_to_ui(&window, session_id, &format!("Terminal {}", session_id + 1));
+                                        Self::add_tab_to_ui(
+                                            &window,
+                                            session_id,
+                                            &format!("Terminal {}", session_id + 1),
+                                        );
                                         window.set_active_tab(session_id as i32);
                                     }
-                                }).unwrap_or_else(|e| log::error!("Failed to invoke UI update: {:?}", e));
+                                })
+                                .unwrap_or_else(|e| {
+                                    log::error!("Failed to invoke UI update: {:?}", e)
+                                });
                             }
                             Err(e) => {
                                 log::error!("Failed to create new session: {}", e);
                             }
                         }
                     });
-                }).unwrap_or_else(|e| log::error!("Failed to invoke from event loop: {:?}", e));
+                })
+                .unwrap_or_else(|e| log::error!("Failed to invoke from event loop: {:?}", e));
             });
         }
 
@@ -122,11 +270,11 @@ impl UIManager {
         {
             let terminal_manager = self.terminal_manager.clone();
             let window_weak = self.window.clone();
-            
+
             window.on_close_tab_clicked(move |tab_id| {
                 let terminal_manager = terminal_manager.clone();
                 let window_weak = window_weak.clone();
-                
+
                 slint::invoke_from_event_loop(move || {
                     tokio::spawn(async move {
                         let mut tm = terminal_manager.lock().await;
@@ -134,27 +282,29 @@ impl UIManager {
                             log::error!("Failed to close session: {}", e);
                             return;
                         }
-                        
+
                         // UI 업데이트
                         slint::invoke_from_event_loop(move || {
                             if let Some(window) = window_weak.upgrade() {
                                 Self::remove_tab_from_ui(&window, tab_id as SessionId);
                             }
-                        }).unwrap_or_else(|e| log::error!("Failed to invoke UI update: {:?}", e));
+                        })
+                        .unwrap_or_else(|e| log::error!("Failed to invoke UI update: {:?}", e));
                     });
-                }).unwrap_or_else(|e| log::error!("Failed to invoke from event loop: {:?}", e));
+                })
+                .unwrap_or_else(|e| log::error!("Failed to invoke from event loop: {:?}", e));
             });
         }
 
         // 터미널 입력 이벤트 핸들러
         {
             let terminal_manager = self.terminal_manager.clone();
-            
+
             window.on_terminal_input(move |input_text| {
                 let terminal_manager = terminal_manager.clone();
                 let input = input_text.to_string();
                 log::debug!("Received terminal input: {:?}", input);
-                
+
                 slint::invoke_from_event_loop(move || {
                     tokio::spawn(async move {
                         let mut tm = terminal_manager.lock().await;
@@ -165,17 +315,48 @@ impl UIManager {
                             }
                         }
                     });
-                }).unwrap_or_else(|e| log::error!("Failed to invoke from event loop: {:?}", e));
+                })
+                .unwrap_or_else(|e| log::error!("Failed to invoke from event loop: {:?}", e));
+            });
+        }
+
+        // 키보드 이벤트 핸들러 설정 (더 정교한 키 처리)
+        {
+            let terminal_manager = self.terminal_manager.clone();
+
+            window.on_terminal_key_event(move |key_code, modifiers, text| {
+                let terminal_manager = terminal_manager.clone();
+                log::debug!("Received key event: key_code={}, modifiers={}, text={:?}", key_code, modifiers, text);
+                
+                // 키 코드와 modifier를 기반으로 터미널 시퀀스 생성
+                let terminal_input = process_key_event(key_code, modifiers, text.as_str());
+                
+                if !terminal_input.is_empty() {
+                    slint::invoke_from_event_loop(move || {
+                        tokio::spawn(async move {
+                            let mut tm = terminal_manager.lock().await;
+                            if let Some(active_session) = tm.get_active_session() {
+                                let session_id = active_session.id;
+                                if let Err(e) = tm.write_to_session(session_id, &terminal_input) {
+                                    log::error!("Failed to write key event to terminal session {}: {}", session_id, e);
+                                }
+                            } else {
+                                log::warn!("No active terminal session for key event");
+                            }
+                        });
+                    })
+                    .unwrap_or_else(|e| log::error!("Failed to invoke from event loop: {:?}", e));
+                }
             });
         }
 
         // 윈도우 리사이즈 이벤트 핸들러
         {
             let terminal_manager = self.terminal_manager.clone();
-            
+
             window.on_window_resized(move |width, height| {
                 let terminal_manager = terminal_manager.clone();
-                
+
                 slint::invoke_from_event_loop(move || {
                     tokio::spawn(async move {
                         let mut tm = terminal_manager.lock().await;
@@ -185,14 +366,15 @@ impl UIManager {
                             let char_height = 16; // 고정 높이 폰트 가정
                             let cols = (width / char_width) as u16;
                             let rows = (height / char_height) as u16;
-                            
+
                             let session_id = active_session.id;
                             if let Err(e) = tm.resize_session(session_id, cols, rows) {
                                 log::error!("Failed to resize terminal: {}", e);
                             }
                         }
                     });
-                }).unwrap_or_else(|e| log::error!("Failed to invoke from event loop: {:?}", e));
+                })
+                .unwrap_or_else(|e| log::error!("Failed to invoke from event loop: {:?}", e));
             });
         }
 
@@ -203,24 +385,25 @@ impl UIManager {
                     tokio::spawn(async move {
                         // 선택된 텍스트 가져오기 (현재는 플레이스홀더)
                         let selected_text = "Selected terminal text"; // TODO: 실제 선택된 텍스트
-                        
+
                         // 클립보드에 복사
                         match crate::utils::platform::Platform::copy_to_clipboard(selected_text) {
                             Ok(_) => log::info!("Text copied to clipboard"),
                             Err(e) => log::error!("Failed to copy to clipboard: {}", e),
                         }
                     });
-                }).unwrap_or_else(|e| log::error!("Failed to invoke from event loop: {:?}", e));
+                })
+                .unwrap_or_else(|e| log::error!("Failed to invoke from event loop: {:?}", e));
             });
         }
 
         // 클립보드 붙여넣기 이벤트 핸들러
         {
             let terminal_manager = self.terminal_manager.clone();
-            
+
             window.on_paste_clipboard(move || {
                 let terminal_manager = terminal_manager.clone();
-                
+
                 slint::invoke_from_event_loop(move || {
                     tokio::spawn(async move {
                         // 클립보드에서 텍스트 가져오기
@@ -239,22 +422,23 @@ impl UIManager {
                             Err(e) => log::error!("Failed to paste from clipboard: {}", e),
                         }
                     });
-                }).unwrap_or_else(|e| log::error!("Failed to invoke from event loop: {:?}", e));
+                })
+                .unwrap_or_else(|e| log::error!("Failed to invoke from event loop: {:?}", e));
             });
         }
 
         // 초기 탭 설정
         self.setup_initial_tabs(&window).await?;
-        
+
         // PTY 이벤트 처리 스레드 시작 (tterm 방식)
         self.start_pty_event_processing().await?;
-        
+
         // UI 업데이트 처리 스레드 시작
         //self.start_ui_update_processing()?;
-        
+
         Ok(())
     }
-    
+
     async fn start_pty_event_processing(&self) -> Result<()> {
         let terminal_manager = self.terminal_manager.clone();
         let ui_update_sender = self.ui_update_sender.clone();
@@ -264,94 +448,79 @@ impl UIManager {
             let mut tm = terminal_manager.lock().await;
             tm.take_pty_event_receiver()
         };
-        
+
         if let Some(receiver) = event_receiver {
             std::thread::Builder::new()
                 .name("pty_event_processor".to_string())
                 .spawn(move || {
                     log::info!("Starting PTY event processor thread");
-                    
+
                     // 이벤트 처리 루프
                     loop {
                         match receiver.recv() {
                             Ok((session_id, event)) => {
                                 log::debug!("Received PTY event for session {}: {:?}", session_id, event);
-                                
+
                                 match &event {
                                     // PTY 출력이나 터미널 상태 변경 시 UI 업데이트
                                     alacritty_terminal::event::Event::Wakeup  => {
                                         // Wakeup이나 Title 변경 시에도 터미널 내용 업데이트
                                         if let Ok(mut tm) = terminal_manager.try_lock() {
-                                                    log::debug!("Terminal content updated on {:?} for session {}:", event, session_id);
-                                                    
+                                            log::debug!("Terminal content updated on {:?} for session {}:", event, session_id);
                                                                                         // 색상 정보 추출 및 UI로 전송 - 폰트 메트릭 사용
-                                    let font_metrics = FontMetrics::default(); // 임시로 기본값 사용
-                                    if let Some(colored_content) = tm.extract_session_colored_content(session_id, &font_metrics) {
-                                        log::debug!("Color segments for session {} ({}): {} segments", session_id, match &event { alacritty_terminal::event::Event::Wakeup => "Wakeup", alacritty_terminal::event::Event::Title(_) => "Title", _ => "Other" }, colored_content.segments.len());
-                                        if colored_content.segments.len() > 0 {
-                                            for (i, segment) in colored_content.segments.iter().take(5).enumerate() {
-                                                log::debug!("  Segment {}: '{}' x={} y={} w={} h={}", i, segment.text.chars().take(20).collect::<String>(), segment.x, segment.y, segment.width, segment.height);
-                                            }
-                                            
-                                            
-                                            let cursor_info =  {
-                                                let font_metrics = FontMetrics::default(); // 임시로 기본값 사용
-                                                {
-                                                    let cursor_x = font_metrics.padding_x + (colored_content.cursor_col as i32) * font_metrics.char_width;
-                                                    let cursor_y = font_metrics.padding_y + (colored_content.cursor_line as i32) * font_metrics.line_height;
-                                                    println!("1 cursor_info:");        
-                                                    CursorInfo {
-                                                        x: cursor_x,
-                                                        y: cursor_y,
-                                                        width: font_metrics.char_width,
-                                                        height: font_metrics.line_height,
-                                                        visible: true,
+                                            let font_metrics = FontMetrics::default(); // 임시로 기본값 사용
+                                            if let Some(colored_content) = tm.extract_session_colored_content(session_id, &font_metrics) {
+                                                log::debug!("Color segments for session {} ({}): {} segments", session_id, match &event { alacritty_terminal::event::Event::Wakeup => "Wakeup", alacritty_terminal::event::Event::Title(_) => "Title", _ => "Other" }, colored_content.segments.len());
+                                                if colored_content.segments.len() > 0 {
+                                                    for (i, segment) in colored_content.segments.iter().take(5).enumerate() {
+                                                        log::debug!("  Segment {}: '{}' x={} y={} w={} h={}", i, segment.text.chars().take(20).collect::<String>(), segment.x, segment.y, segment.width, segment.height);
                                                     }
-                                                } 
-                                            } ;
-                                            println!(">cursor_info: {:?}", cursor_info);
-                                            let slint_segments: Vec<ColorSegment> = colored_content.segments.iter().map(|seg| {
-                                                ColorSegment {
-                                                    text: seg.text.clone().into(),
-                                                    fg_r: seg.fg_color.r as i32,
-                                                    fg_g: seg.fg_color.g as i32,
-                                                    fg_b: seg.fg_color.b as i32,
-                                                    bg_r: seg.bg_color.r as i32,
-                                                    bg_g: seg.bg_color.g as i32,
-                                                    bg_b: seg.bg_color.b as i32,
-                                                    x: seg.x,      // 이미 계산된 절대 X 위치
-                                                    y: seg.y,      // 이미 계산된 절대 Y 위치
-                                                    width: seg.width,  // 이미 계산된 폭
-                                                    height: seg.height, // 이미 계산된 높이
-                                                }
-                                            }).collect();
-                                            let window_weak = window_weak.clone();
-                                            slint::invoke_from_event_loop(move || {
-                                                if let Some(window) = window_weak.upgrade() {
-                                                    // 색상 세그먼트 설정
-                                                    let model = ModelRc::new(VecModel::from(slint_segments));
-                                                    window.set_color_segments(model);
-                                                    
-                                                    // 커서 정보 설정
-                                                    let cursor_x = cursor_info.x;
-                                                    let cursor_y = cursor_info.y;
-                                                    window.set_cursor_info(cursor_info);
-                                                    
-                                                   
-                                                }
-                                            }).unwrap_or_else(|e| 
-                                                log::error!("Failed to invoke colored UI update: {:?}", e));
+                                                    let cursor_info =  {
+                                                        let font_metrics = FontMetrics::default(); // 임시로 기본값 사용
+                                                        {
+                                                            let cursor_x = font_metrics.padding_x + (colored_content.cursor_col as i32) * font_metrics.char_width;
+                                                            let cursor_y = font_metrics.padding_y + (colored_content.cursor_line as i32) * font_metrics.line_height;
+                                                            CursorInfo {
+                                                                x: cursor_x,
+                                                                y: cursor_y,
+                                                                width: font_metrics.char_width,
+                                                                height: font_metrics.line_height,
+                                                                visible: true,
+                                                            }
+                                                        }
+                                                    } ;
+                                                    let slint_segments: Vec<ColorSegment> = colored_content.segments.iter().map(|seg| {
+                                                        ColorSegment {
+                                                            text: seg.text.clone().into(),
+                                                            fg_r: seg.fg_color.r as i32,
+                                                            fg_g: seg.fg_color.g as i32,
+                                                            fg_b: seg.fg_color.b as i32,
+                                                            bg_r: seg.bg_color.r as i32,
+                                                            bg_g: seg.bg_color.g as i32,
+                                                            bg_b: seg.bg_color.b as i32,
+                                                            x: seg.x,      // 이미 계산된 절대 X 위치
+                                                            y: seg.y,      // 이미 계산된 절대 Y 위치
+                                                            width: seg.width,  // 이미 계산된 폭
+                                                            height: seg.height, // 이미 계산된 높이
+                                                        }
+                                                    }).collect();
+                                                    let window_weak = window_weak.clone();
+                                                    slint::invoke_from_event_loop(move || {
+                                                        if let Some(window) = window_weak.upgrade() {
+                                                            // 색상 세그먼트 설정
+                                                            let model = ModelRc::new(VecModel::from(slint_segments));
+                                                            window.set_color_segments(model);
+                                                            window.set_cursor_info(cursor_info);
+
+                                                        }
+                                                    }).unwrap_or_else(|e|
+                                                        log::error!("Failed to invoke colored UI update: {:?}", e));
+                                                    }
                                             }
-                                    }
-                                                    
-                                                    // UI 업데이트 메시지 전송
-                                                    
-                                                }
-                                     
+                                        }
                                     }
                                     alacritty_terminal::event::Event::Exit => {
                                         log::info!("Terminal session {} exited", session_id);
-                                        
                                         // 세션 종료 메시지 전송
                                         if let Err(e) = ui_update_sender.send(UIUpdateMessage::SessionClosed { session_id }) {
                                             log::error!("Failed to send session closed message: {}", e);
@@ -360,6 +529,7 @@ impl UIManager {
                                     }
                                     _ => {
                                         // 다른 이벤트들은 무시
+                                        println!("other event: {:?}", event);
                                     }
                                 }
                             }
@@ -369,25 +539,21 @@ impl UIManager {
                             }
                         }
                     }
-                    
+
                     log::info!("PTY event processor thread ended");
                 })?;
         }
-        
+
         Ok(())
     }
-    
-    
 
     async fn setup_initial_tabs(&self, window: &MainWindow) -> Result<()> {
         // 초기 탭 데이터 설정
-        let initial_tabs = vec![
-            crate::TabInfo {
-                title: "Terminal 1".into(),
-                active: true,
-                id: 0,
-            }
-        ];
+        let initial_tabs = vec![crate::TabInfo {
+            title: "Terminal 1".into(),
+            active: true,
+            id: 0,
+        }];
 
         let tabs_model = VecModel::from(initial_tabs);
         window.set_tabs(ModelRc::new(tabs_model));
@@ -397,16 +563,16 @@ impl UIManager {
 
         Ok(())
     }
-    
+
     async fn setup_ui_update_callback(&self) -> Result<()> {
         let terminal_manager = self.terminal_manager.clone();
         let window_weak = self.window.clone();
-        
+
         // 터미널 매니저에 UI 업데이트 콜백 설정
         let mut tm = terminal_manager.lock().await;
         tm.set_ui_update_callback(Box::new(move |session_id: SessionId, content: String| {
             let window_weak = window_weak.clone();
-            
+
             // UI 업데이트를 메인 스레드에서 실행 - color_segments 우선 사용
             // slint::invoke_from_event_loop(move || {
             //     if let Some(window) = window_weak.upgrade() {
@@ -414,16 +580,19 @@ impl UIManager {
             //         log::debug!("UI updated with terminal content for session {}", session_id);
             //     }
             // }).unwrap_or_else(|e| log::error!("Failed to invoke UI update: {:?}", e));
-            log::debug!("Skipping direct terminal content update for session {} (using color_segments)", session_id);
+            log::debug!(
+                "Skipping direct terminal content update for session {} (using color_segments)",
+                session_id
+            );
         }));
-        
+
         Ok(())
     }
 
     fn add_tab_to_ui(window: &MainWindow, session_id: SessionId, title: &str) {
         let tabs = window.get_tabs();
         let mut tab_data = Vec::new();
-        
+
         // 기존 탭들 (비활성화)
         for i in 0..tabs.row_count() {
             if let Some(mut tab) = tabs.row_data(i) {
@@ -431,14 +600,14 @@ impl UIManager {
                 tab_data.push(tab);
             }
         }
-        
+
         // 새 탭 추가 (활성화)
         tab_data.push(crate::TabInfo {
             title: title.into(),
             active: true,
             id: session_id as i32,
         });
-        
+
         let new_tabs_model = VecModel::from(tab_data);
         window.set_tabs(ModelRc::new(new_tabs_model));
     }
@@ -447,7 +616,7 @@ impl UIManager {
         let tabs = window.get_tabs();
         let tab_id = session_id as i32;
         let mut tab_data = Vec::new();
-        
+
         // 해당 탭을 제외한 모든 탭 수집
         for i in 0..tabs.row_count() {
             if let Some(tab) = tabs.row_data(i) {
@@ -456,7 +625,7 @@ impl UIManager {
                 }
             }
         }
-        
+
         let new_tabs_model = VecModel::from(tab_data);
         window.set_tabs(ModelRc::new(new_tabs_model));
     }
