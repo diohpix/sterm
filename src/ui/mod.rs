@@ -250,7 +250,7 @@ impl UIManager {
         self.start_pty_event_processing().await?;
         
         // UI 업데이트 처리 스레드 시작
-        self.start_ui_update_processing()?;
+        //self.start_ui_update_processing()?;
         
         Ok(())
     }
@@ -258,7 +258,7 @@ impl UIManager {
     async fn start_pty_event_processing(&self) -> Result<()> {
         let terminal_manager = self.terminal_manager.clone();
         let ui_update_sender = self.ui_update_sender.clone();
-        
+        let window_weak = self.window.clone();
         // TerminalManager로부터 이벤트 수신기 가져오기
         let event_receiver = {
             let mut tm = terminal_manager.lock().await;
@@ -282,8 +282,6 @@ impl UIManager {
                                     alacritty_terminal::event::Event::Wakeup  => {
                                         // Wakeup이나 Title 변경 시에도 터미널 내용 업데이트
                                         if let Ok(mut tm) = terminal_manager.try_lock() {
-                                            //if let Some(terminal_text) = tm.extract_session_terminal_text(session_id) {
-                                              //  if !terminal_text.is_empty() {
                                                     log::debug!("Terminal content updated on {:?} for session {}:", event, session_id);
                                                     
                                                                                         // 색상 정보 추출 및 UI로 전송 - 폰트 메트릭 사용
@@ -295,17 +293,7 @@ impl UIManager {
                                                 log::debug!("  Segment {}: '{}' x={} y={} w={} h={}", i, segment.text.chars().take(20).collect::<String>(), segment.x, segment.y, segment.width, segment.height);
                                             }
                                             
-                                            // 색상 정보를 UI로 전송
-                                            log::debug!("🟢 Sending ColoredTerminalContent message for session {} with {} segments", session_id, colored_content.segments.len());
-                                            if let Err(e) = ui_update_sender.send(UIUpdateMessage::ColoredTerminalContent {
-                                                session_id,
-                                                segments: colored_content.segments,
-                                            }) {
-                                                log::error!("Failed to send colored UI update message: {}", e);
-                                            } else {
-                                                log::debug!("🟢 Successfully sent ColoredTerminalContent message");
-                                            }
-                                            let terminal_manager_for_cursor = terminal_manager.clone();
+                                            
                                             let cursor_info =  {
                                                 let font_metrics = FontMetrics::default(); // 임시로 기본값 사용
                                                 {
@@ -322,7 +310,38 @@ impl UIManager {
                                                 } 
                                             } ;
                                             println!(">cursor_info: {:?}", cursor_info);
-                                        }
+                                            let slint_segments: Vec<ColorSegment> = colored_content.segments.iter().map(|seg| {
+                                                ColorSegment {
+                                                    text: seg.text.clone().into(),
+                                                    fg_r: seg.fg_color.r as i32,
+                                                    fg_g: seg.fg_color.g as i32,
+                                                    fg_b: seg.fg_color.b as i32,
+                                                    bg_r: seg.bg_color.r as i32,
+                                                    bg_g: seg.bg_color.g as i32,
+                                                    bg_b: seg.bg_color.b as i32,
+                                                    x: seg.x,      // 이미 계산된 절대 X 위치
+                                                    y: seg.y,      // 이미 계산된 절대 Y 위치
+                                                    width: seg.width,  // 이미 계산된 폭
+                                                    height: seg.height, // 이미 계산된 높이
+                                                }
+                                            }).collect();
+                                            let window_weak = window_weak.clone();
+                                            slint::invoke_from_event_loop(move || {
+                                                if let Some(window) = window_weak.upgrade() {
+                                                    // 색상 세그먼트 설정
+                                                    let model = ModelRc::new(VecModel::from(slint_segments));
+                                                    window.set_color_segments(model);
+                                                    
+                                                    // 커서 정보 설정
+                                                    let cursor_x = cursor_info.x;
+                                                    let cursor_y = cursor_info.y;
+                                                    window.set_cursor_info(cursor_info);
+                                                    
+                                                   
+                                                }
+                                            }).unwrap_or_else(|e| 
+                                                log::error!("Failed to invoke colored UI update: {:?}", e));
+                                            }
                                     }
                                                     
                                                     // UI 업데이트 메시지 전송
@@ -358,119 +377,7 @@ impl UIManager {
         Ok(())
     }
     
-    fn start_ui_update_processing(&mut self) -> Result<()> {
-        let window_weak = self.window.clone();
-        let terminal_manager = self.terminal_manager.clone();
-        
-        // UI 업데이트 수신기 가져오기
-        let ui_update_receiver = self.ui_update_receiver.take()
-            .ok_or_else(|| anyhow::anyhow!("UI update receiver already taken"))?;
-        
-        std::thread::Builder::new()
-            .name("ui_update_processor".to_string())
-            .spawn(move || {
-                log::info!("Starting UI update processor thread");
-                
-                // UI 업데이트 처리 루프
-                loop {
-                    match ui_update_receiver.recv() {
-                        Ok(message) => {
-                            
-                            match message {
-                                UIUpdateMessage::ColoredTerminalContent { session_id, segments } => {
-                                    log::debug!("📗 Processing ColoredTerminalContent message for session {} with {} segments", session_id, segments.len());
-                                    
-                                    // 세그먼트들을 간단히 Slint ColorSegment로 변환 (위치는 이미 계산됨)
-                                    let slint_segments: Vec<ColorSegment> = segments.iter().map(|seg| {
-                                        ColorSegment {
-                                            text: seg.text.clone().into(),
-                                            fg_r: seg.fg_color.r as i32,
-                                            fg_g: seg.fg_color.g as i32,
-                                            fg_b: seg.fg_color.b as i32,
-                                            bg_r: seg.bg_color.r as i32,
-                                            bg_g: seg.bg_color.g as i32,
-                                            bg_b: seg.bg_color.b as i32,
-                                            x: seg.x,      // 이미 계산된 절대 X 위치
-                                            y: seg.y,      // 이미 계산된 절대 Y 위치
-                                            width: seg.width,  // 이미 계산된 폭
-                                            height: seg.height, // 이미 계산된 높이
-                                        }
-                                    }).collect();
-                                    
-                                    // 커서 위치 계산 (터미널에서 가져온 커서 정보 사용)
-                                    let terminal_manager_for_cursor = terminal_manager.clone();
-                                    let cursor_info = if let Ok(mut tm) = terminal_manager_for_cursor.try_lock() {
-                                        let font_metrics = FontMetrics::default(); // 임시로 기본값 사용
-                                        if let Some(colored_content) = tm.extract_session_colored_content(session_id, &font_metrics) {
-                                            let cursor_x = font_metrics.padding_x + (colored_content.cursor_col as i32) * font_metrics.char_width;
-                                            let cursor_y = font_metrics.padding_y + (colored_content.cursor_line as i32) * font_metrics.line_height;
-                                            
-                                            CursorInfo {
-                                                x: cursor_x,
-                                                y: cursor_y,
-                                                width: font_metrics.char_width,
-                                                height: font_metrics.line_height,
-                                                visible: true,
-                                            }
-                                        } else {
-                                            // 기본 커서 정보
-                                            let font_metrics = FontMetrics::default();
-                                            CursorInfo {
-                                                x: font_metrics.padding_x,
-                                                y: font_metrics.padding_y,
-                                                width: font_metrics.char_width,
-                                                height: font_metrics.line_height,
-                                                visible: true,
-                                            }
-                                        }
-                                    } else {
-                                        // 락을 획득할 수 없는 경우 기본값
-                                        let font_metrics = FontMetrics::default();
-                                        CursorInfo {
-                                            x: font_metrics.padding_x,
-                                            y: font_metrics.padding_y,
-                                            width: font_metrics.char_width,
-                                            height: font_metrics.line_height,
-                                            visible: true,
-                                        }
-                                    };
-                                    println!("cursor_info: {:?}", cursor_info);
-                                    // 색상 정보와 커서 정보가 포함된 UI 업데이트
-                                    let window_weak = window_weak.clone();
-                                    slint::invoke_from_event_loop(move || {
-                                        if let Some(window) = window_weak.upgrade() {
-                                            // 색상 세그먼트 설정
-                                            let model = ModelRc::new(VecModel::from(slint_segments));
-                                            window.set_color_segments(model);
-                                            
-                                            // 커서 정보 설정
-                                            let cursor_x = cursor_info.x;
-                                            let cursor_y = cursor_info.y;
-                                            window.set_cursor_info(cursor_info);
-                                            
-                                            log::debug!("📗 UI updated with colored terminal content for session {}: {} segments, cursor at ({}, {})", 
-                                                session_id, segments.len(), cursor_x, cursor_y);
-                                        }
-                                    }).unwrap_or_else(|e| log::error!("Failed to invoke colored UI update: {:?}", e));
-                                }
-                                UIUpdateMessage::SessionClosed { session_id } => {
-                                    log::info!("Session {} closed", session_id);
-                                    // TODO: 탭 제거 로직 추가
-                                }
-                            }
-                        }
-                        Err(_) => {
-                            log::warn!("UI update receiver channel closed");
-                            break;
-                        }
-                    }
-                }
-                
-                log::info!("UI update processor thread ended");
-            })?;
-        
-        Ok(())
-    }
+    
 
     async fn setup_initial_tabs(&self, window: &MainWindow) -> Result<()> {
         // 초기 탭 데이터 설정
