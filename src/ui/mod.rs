@@ -12,7 +12,6 @@ use crate::{MainWindow, ColorSegment, CursorInfo};
 // UI 업데이트 메시지 타입
 #[derive(Debug, Clone)]
 pub enum UIUpdateMessage {
-    TerminalContent { session_id: SessionId, content: String },
     ColoredTerminalContent { session_id: SessionId, segments: Vec<crate::terminal::ColoredTextSegment> },
     SessionClosed { session_id: SessionId },
 }
@@ -280,13 +279,12 @@ impl UIManager {
                                 
                                 match &event {
                                     // PTY 출력이나 터미널 상태 변경 시 UI 업데이트
-                                    alacritty_terminal::event::Event::Wakeup |
-                                    alacritty_terminal::event::Event::Title(_) => {
+                                    alacritty_terminal::event::Event::Wakeup  => {
                                         // Wakeup이나 Title 변경 시에도 터미널 내용 업데이트
                                         if let Ok(mut tm) = terminal_manager.try_lock() {
-                                            if let Some(terminal_text) = tm.extract_session_terminal_text(session_id) {
-                                                if !terminal_text.is_empty() {
-                                                    log::debug!("Terminal content updated on {:?} for session {}: {:?}", event, session_id, terminal_text);
+                                            //if let Some(terminal_text) = tm.extract_session_terminal_text(session_id) {
+                                              //  if !terminal_text.is_empty() {
+                                                    log::debug!("Terminal content updated on {:?} for session {}:", event, session_id);
                                                     
                                                                                         // 색상 정보 추출 및 UI로 전송 - 폰트 메트릭 사용
                                     let font_metrics = FontMetrics::default(); // 임시로 기본값 사용
@@ -311,15 +309,9 @@ impl UIManager {
                                     }
                                                     
                                                     // UI 업데이트 메시지 전송
-                                                    if let Err(e) = ui_update_sender.send(UIUpdateMessage::TerminalContent {
-                                                        session_id,
-                                                        content: terminal_text,
-                                                    }) {
-                                                        log::error!("Failed to send UI update message: {}", e);
-                                                    }
+                                                    
                                                 }
-                                            }
-                                        }
+                                     
                                     }
                                     alacritty_terminal::event::Event::Exit => {
                                         log::info!("Terminal session {} exited", session_id);
@@ -368,17 +360,6 @@ impl UIManager {
                         Ok(message) => {
                             
                             match message {
-                                UIUpdateMessage::TerminalContent { session_id, content } => {
-                                    // 기본 터미널 내용 업데이트 제거 - color_segments 우선 사용
-                                    log::debug!("Skipping terminal content update for session {} (using color_segments instead)", session_id);
-                                    // let window_weak = window_weak.clone();
-                                    // slint::invoke_from_event_loop(move || {
-                                    //     if let Some(window) = window_weak.upgrade() {
-                                    //         window.set_terminal_content(content.into());
-                                    //         log::debug!("UI updated with terminal content for session {}", session_id);
-                                    //     }
-                                    // }).unwrap_or_else(|e| log::error!("Failed to invoke UI update: {:?}", e));
-                                }
                                 UIUpdateMessage::ColoredTerminalContent { session_id, segments } => {
                                     log::debug!("📗 Processing ColoredTerminalContent message for session {} with {} segments", session_id, segments.len());
                                     

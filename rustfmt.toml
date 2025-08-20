@@ -1,0 +1,10 @@
+# Rust 기본 포맷팅 설정 (stable 채널용)
+edition = "2021"
+hard_tabs = false
+tab_spaces = 4
+max_width = 100
+use_small_heuristics = "Default"
+reorder_imports = true
+reorder_modules = true
+remove_nested_parens = true
+force_explicit_abi = true
