@@ -7,139 +7,72 @@ use tokio::sync::Mutex;
 
 use crate::terminal::{SessionId, TerminalManager};
 use crate::utils::font::FontMetrics;
-use crate::{ColorSegment, CursorInfo, MainWindow};
+use crate::{ColorSegment, CursorInfo, MainWindow, TerminalKeyEvent};
 
-// 터미널 키 코드 상수들 (Slint의 키 코드와 대응)
-const KEY_BACKSPACE: i32 = 8;
-const KEY_TAB: i32 = 9;
-const KEY_ENTER: i32 = 10;
-const KEY_ESCAPE: i32 = 27;
-const KEY_DELETE: i32 = 127;
-const KEY_UP: i32 = 38;
-const KEY_DOWN: i32 = 40;
-const KEY_LEFT: i32 = 37;
-const KEY_RIGHT: i32 = 39;
-const KEY_HOME: i32 = 36;
-const KEY_END: i32 = 35;
-const KEY_PAGE_UP: i32 = 33;
-const KEY_PAGE_DOWN: i32 = 34;
-
-// Modifier 플래그 상수들
-const MODIFIER_SHIFT: i32 = 1;
-const MODIFIER_CTRL: i32 = 2;
-const MODIFIER_ALT: i32 = 4;
-const MODIFIER_META: i32 = 8;
-
-/// 키 이벤트를 터미널 시퀀스로 변환
-fn process_key_event(key_code: i32, modifiers: i32, text: &str) -> String {
-    let ctrl_pressed = (modifiers & MODIFIER_CTRL) != 0;
-    let alt_pressed = (modifiers & MODIFIER_ALT) != 0;
-    let shift_pressed = (modifiers & MODIFIER_SHIFT) != 0;
-    
-    log::debug!("Processing key: code={}, modifiers={}, ctrl={}, alt={}, shift={}, text='{}'", 
-                key_code, modifiers, ctrl_pressed, alt_pressed, shift_pressed, text);
-
-    // Ctrl 조합 키들
-    if ctrl_pressed {
-        match key_code {
-            // Ctrl+A ~ Ctrl+Z (ASCII 1-26)
-            65..=90 => {  // A-Z
-                let ctrl_char = (key_code - 64) as u8;
-                return String::from_utf8_lossy(&[ctrl_char]).to_string();
-            }
-            97..=122 => { // a-z
-                let ctrl_char = (key_code - 96) as u8;
-                return String::from_utf8_lossy(&[ctrl_char]).to_string();
-            }
-            KEY_ENTER => return "\n".to_string(),
-            _ => {}
-        }
+/// 터미널로 전달하기에 안전한 키 입력인지 확인하고 필요시 변환  
+fn process_and_filter_terminal_input(event: &TerminalKeyEvent) -> Option<String> {
+    let input = &event.text.to_string();
+    if input.is_empty() {
+        log::debug!("Filtered: empty input");
+        return None;
     }
-
-    // 특수 키들
-    match key_code {
-        KEY_BACKSPACE => "\x08".to_string(), // Backspace
-        KEY_TAB => {
-            if shift_pressed {
-                "\x1b[Z".to_string() // Shift+Tab
-            } else {
-                "\t".to_string() // Tab
+    
+    // 완전히 공백으로만 구성된 문자열 필터링
+    
+    
+    // 단일 문자인 경우
+    if input.len() == 1 {
+        let ch = input.chars().next().unwrap();
+        match ch {
+            // 일반적인 출력 가능한 ASCII 문자들
+            ' '..='~' => Some(input.to_string()),
+            // 허용할 제어 문자들
+            '\n' | '\r' | '\t' | '\u{08}' => Some(input.to_string()), // Enter, CR, Tab, Backspace
+            // Ctrl+L (clear screen) 허용
+            '\u{0c}' => {
+                log::debug!("Clear screen command detected (Ctrl+L)");
+                Some(input.to_string())
             }
-        },
-        KEY_ENTER => "\n".to_string(),
-        KEY_ESCAPE => "\x1b".to_string(),
-        KEY_DELETE => "\x7f".to_string(),
-        
-        // 방향키들 (ANSI escape sequences)
-        KEY_UP => {
-            if ctrl_pressed {
-                "\x1b[1;5A".to_string() // Ctrl+Up
-            } else if alt_pressed {
-                "\x1b[1;3A".to_string() // Alt+Up
-            } else {
-                "\x1b[A".to_string() // Up
+            // 나머지 제어 문자들은 필터링
+            '\u{00}'..='\u{1f}' | '\u{7f}' => {
+                log::debug!("Filtered control character: {:?} (\\u{{{:04x}}})", ch, ch as u32);
+                None
             }
-        },
-        KEY_DOWN => {
-            if ctrl_pressed {
-                "\x1b[1;5B".to_string() // Ctrl+Down
-            } else if alt_pressed {
-                "\x1b[1;3B".to_string() // Alt+Down
-            } else {
-                "\x1b[B".to_string() // Down
+            // macOS 특수 키 범위 필터링
+            '\u{f700}'..='\u{f8ff}' => {
+                log::debug!("Filtered macOS special key: {:?} (\\u{{{:04x}}})", ch, ch as u32);
+                None
             }
-        },
-        KEY_RIGHT => {
-            if ctrl_pressed {
-                "\x1b[1;5C".to_string() // Ctrl+Right
-            } else if alt_pressed {
-                "\x1b[1;3C".to_string() // Alt+Right
-            } else {
-                "\x1b[C".to_string() // Right
-            }
-        },
-        KEY_LEFT => {
-            if ctrl_pressed {
-                "\x1b[1;5D".to_string() // Ctrl+Left
-            } else if alt_pressed {
-                "\x1b[1;3D".to_string() // Alt+Left
-            } else {
-                "\x1b[D".to_string() // Left
-            }
-        },
-        
-        KEY_HOME => {
-            if ctrl_pressed {
-                "\x1b[1;5H".to_string()
-            } else {
-                "\x1b[H".to_string()
-            }
-        },
-        KEY_END => {
-            if ctrl_pressed {
-                "\x1b[1;5F".to_string()
-            } else {
-                "\x1b[F".to_string()
-            }
-        },
-        KEY_PAGE_UP => "\x1b[5~".to_string(),
-        KEY_PAGE_DOWN => "\x1b[6~".to_string(),
-        
-        _ => {
-            // 일반 문자 입력의 경우 text를 사용
-            if !text.is_empty() {
-                if alt_pressed {
-                    // Alt+문자의 경우 ESC prefix 추가
-                    format!("\x1b{}", text)
-                } else {
-                    text.to_string()
-                }
-            } else {
-                String::new()
-            }
+            // 기타 유니코드 문자들은 허용 (다국어 입력 지원)
+            _ => Some(input.to_string()),
         }
+    } else {
+        // 멀티바이트 문자열의 경우
+        
+        // macOS 특수 키들이 포함된 경우 필터링
+        if input.chars().any(|c| matches!(c, '\u{f700}'..='\u{f8ff}')) {
+            log::debug!("Filtered macOS special key sequence: {:?}", input);
+            return None;
+        }
+        
+        // escape sequence 필터링
+        if input.starts_with('\u{1b}') {
+            log::debug!("Filtered escape sequence: {:?}", input);
+            return None;
+        }
+        
+        // 대부분 제어 문자로만 구성된 경우 필터링
+        if input.chars().all(|c| c.is_control() && !matches!(c, '\n' | '\r' | '\t' | '\u{08}' | '\u{0c}')) {
+            log::debug!("Filtered control sequence: {:?}", input);
+            return None;
+        }
+        
+        // 일반적인 멀티바이트 문자열 허용 (유니코드, 복합 입력 등)
+        Some(input.to_string())
     }
 }
+
+
 
 // UI 업데이트 메시지 타입
 #[derive(Debug, Clone)]
@@ -300,55 +233,35 @@ impl UIManager {
         {
             let terminal_manager = self.terminal_manager.clone();
 
-            window.on_terminal_input(move |input_text| {
+            window.on_terminal_input(move |event| {
                 let terminal_manager = terminal_manager.clone();
-                let input = input_text.to_string();
-                log::debug!("Received terminal input: {:?}", input);
+                log::debug!("Received terminal input event: text={:?}, modifiers={{alt:{}, ctrl:{}, meta:{}, shift:{}}}, repeat:{}", 
+                    event.text, event.modifiers.alt, event.modifiers.control, event.modifiers.meta, event.modifiers.shift, event.repeat);
 
-                slint::invoke_from_event_loop(move || {
-                    tokio::spawn(async move {
-                        let mut tm = terminal_manager.lock().await;
-                        if let Some(active_session) = tm.get_active_session() {
-                            let session_id = active_session.id;
-                            if let Err(e) = tm.write_to_session(session_id, &input) {
-                                log::error!("Failed to write to terminal: {}", e);
-                            }
+                // 키 입력 필터링 - 안전한 입력만 터미널로 전달
+                let filtered_input = match process_and_filter_terminal_input(&event) {
+                    Some(processed) => processed,
+                    None => {
+                        log::debug!("Filtered unsafe terminal input: {:?}", event.text);
+                        return;
+                    }
+                };
+
+                // 별도 스레드 없이 바로 PTY에 쓰기
+                if let Ok(tm) = terminal_manager.try_lock() {
+                    if let Some(active_session) = tm.get_active_session() {
+                        let session_id = active_session.id;
+                        if let Err(e) = tm.write_to_session(session_id, &filtered_input) {
+                            log::error!("Failed to write to terminal: {}", e);
                         }
-                    });
-                })
-                .unwrap_or_else(|e| log::error!("Failed to invoke from event loop: {:?}", e));
+                    }
+                } else {
+                    log::warn!("Could not acquire terminal manager lock for input: {:?}", event.text);
+                };
             });
         }
 
-        // 키보드 이벤트 핸들러 설정 (더 정교한 키 처리)
-        {
-            let terminal_manager = self.terminal_manager.clone();
 
-            window.on_terminal_key_event(move |key_code, modifiers, text| {
-                let terminal_manager = terminal_manager.clone();
-                log::debug!("Received key event: key_code={}, modifiers={}, text={:?}", key_code, modifiers, text);
-                
-                // 키 코드와 modifier를 기반으로 터미널 시퀀스 생성
-                let terminal_input = process_key_event(key_code, modifiers, text.as_str());
-                
-                if !terminal_input.is_empty() {
-                    slint::invoke_from_event_loop(move || {
-                        tokio::spawn(async move {
-                            let mut tm = terminal_manager.lock().await;
-                            if let Some(active_session) = tm.get_active_session() {
-                                let session_id = active_session.id;
-                                if let Err(e) = tm.write_to_session(session_id, &terminal_input) {
-                                    log::error!("Failed to write key event to terminal session {}: {}", session_id, e);
-                                }
-                            } else {
-                                log::warn!("No active terminal session for key event");
-                            }
-                        });
-                    })
-                    .unwrap_or_else(|e| log::error!("Failed to invoke from event loop: {:?}", e));
-                }
-            });
-        }
 
         // 윈도우 리사이즈 이벤트 핸들러
         {

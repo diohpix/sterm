@@ -492,8 +492,9 @@ impl TerminalSession {
 
         // 생성된 세그먼트들을 자세히 디버그 출력
         for (i, seg) in segments.iter().enumerate() {
-            let text_preview = if seg.text.len() > 30 {
-                format!("{}...", &seg.text[..30])
+            let text_preview = if seg.text.chars().count() > 30 {
+                let truncated: String = seg.text.chars().take(30).collect();
+                format!("{}...", truncated)
             } else {
                 seg.text.clone()
             };
@@ -501,7 +502,7 @@ impl TerminalSession {
                 .replace('\n', "\\n")
                 .replace('\r', "\\r")
                 .replace('\t', "\\t");
-            log::debug!(
+           /* log::debug!(
                 "🎨 Generated Segment[{}]: text='{}' len={} line={} x={} y={} w={} h={}",
                 i,
                 text_escaped,
@@ -511,7 +512,7 @@ impl TerminalSession {
                 seg.y,
                 seg.width,
                 seg.height
-            );
+            );*/
         }
 
         ColoredTerminalContent {
