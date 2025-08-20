@@ -279,37 +279,7 @@ impl UIManager {
                                 log::debug!("Received PTY event for session {}: {:?}", session_id, event);
                                 
                                 match &event {
-                                    alacritty_terminal::event::Event::PtyWrite(data) => {
-                                        let text = String::from_utf8_lossy(data.as_bytes());
-                                        log::debug!("PTY output for session {}: {:?}", session_id, text);
-                                        
-                                        // 실제 터미널 grid에서 콘텐츠 추출 (tterm/mterm 방식)
-                                        if let Ok(mut tm) = terminal_manager.try_lock() {
-                                            if let Some(terminal_text) = tm.extract_session_terminal_text(session_id) {
-                                                log::debug!("Extracted terminal text for session {}: {:?}", session_id, terminal_text);
-                                                
-                                                // 색상 정보도 추출해서 로그 확인 (임시) - 폰트 메트릭 사용
-                                                let font_metrics = FontMetrics::default(); // 임시로 기본값 사용
-                                                if let Some(colored_content) = tm.extract_session_colored_content(session_id, &font_metrics) {
-                                                    log::debug!("Color segments for session {}: {} segments", session_id, colored_content.segments.len());
-                                                    if colored_content.segments.len() > 0 {
-                                                        for (i, segment) in colored_content.segments.iter().take(5).enumerate() {
-                                                            log::debug!("  Segment {}: '{}' x={} y={} w={} h={}", i, segment.text.chars().take(20).collect::<String>(), segment.x, segment.y, segment.width, segment.height);
-                                                        }
-                                                    }
-                                                }
-                                                
-                                                // UI 업데이트 메시지 전송
-                                                if let Err(e) = ui_update_sender.send(UIUpdateMessage::TerminalContent {
-                                                    session_id,
-                                                    content: terminal_text,
-                                                }) {
-                                                    log::error!("Failed to send UI update message: {}", e);
-                                                }
-                                            }
-                                        }
-                                    }
-                                    // 다른 이벤트들도 터미널 상태를 업데이트할 수 있으므로 처리
+                                    // PTY 출력이나 터미널 상태 변경 시 UI 업데이트
                                     alacritty_terminal::event::Event::Wakeup |
                                     alacritty_terminal::event::Event::Title(_) => {
                                         // Wakeup이나 Title 변경 시에도 터미널 내용 업데이트

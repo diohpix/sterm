@@ -139,7 +139,7 @@ export component TerminalView inherits Rectangle {
             for segment[i] in color_segments: Rectangle {
                 x: segment.x * 1px;      // Rust에서 계산된 절대 X 위치
                 y: segment.y * 1px;      // Rust에서 계산된 절대 Y 위치
-                //width: segment.width * 1px;  // Rust에서 계산된 폭
+                width: segment.width * 1px;  // Rust에서 계산된 폭
                 height: segment.height * 1px; // Rust에서 계산된 높이
                 background: rgb(segment.bg_r, segment.bg_g, segment.bg_b);
                 
