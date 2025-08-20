@@ -305,6 +305,23 @@ impl UIManager {
                                             } else {
                                                 log::debug!("🟢 Successfully sent ColoredTerminalContent message");
                                             }
+                                            let terminal_manager_for_cursor = terminal_manager.clone();
+                                            let cursor_info =  {
+                                                let font_metrics = FontMetrics::default(); // 임시로 기본값 사용
+                                                {
+                                                    let cursor_x = font_metrics.padding_x + (colored_content.cursor_col as i32) * font_metrics.char_width;
+                                                    let cursor_y = font_metrics.padding_y + (colored_content.cursor_line as i32) * font_metrics.line_height;
+                                                    println!("1 cursor_info:");        
+                                                    CursorInfo {
+                                                        x: cursor_x,
+                                                        y: cursor_y,
+                                                        width: font_metrics.char_width,
+                                                        height: font_metrics.line_height,
+                                                        visible: true,
+                                                    }
+                                                } 
+                                            } ;
+                                            println!(">cursor_info: {:?}", cursor_info);
                                         }
                                     }
                                                     
@@ -417,7 +434,7 @@ impl UIManager {
                                             visible: true,
                                         }
                                     };
-                                    
+                                    println!("cursor_info: {:?}", cursor_info);
                                     // 색상 정보와 커서 정보가 포함된 UI 업데이트
                                     let window_weak = window_weak.clone();
                                     slint::invoke_from_event_loop(move || {
