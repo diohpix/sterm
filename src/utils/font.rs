@@ -1,5 +1,38 @@
 use anyhow::Result;
 
+// 폰트 메트릭 구조체 (UI와 터미널 모듈에서 공통 사용)
+#[derive(Debug, Clone)]
+pub struct FontMetrics {
+    pub char_width: i32,   // 문자 폭 (픽셀)
+    pub line_height: i32,  // 줄 높이 (픽셀)
+    pub baseline: i32,     // 베이스라인 오프셋
+    pub padding_x: i32,    // 터미널 좌측 패딩
+    pub padding_y: i32,    // 터미널 상단 패딩
+}
+
+impl FontMetrics {
+    /// D2Coding 폰트의 메트릭을 폰트 크기에 따라 계산
+    pub fn for_d2coding(font_size: i32) -> Self {
+        // D2Coding은 고정폭 폰트이므로 폰트 크기에 비례한 계산
+        let char_width = (font_size as f32 * 0.6) as i32;  // 일반적으로 높이의 60% 정도
+        let line_height = (font_size as f32 * 1.2) as i32; // 1.2배 줄간격
+        let baseline = (line_height as f32 * 0.8) as i32;  // 80% 지점이 베이스라인
+        
+        Self {
+            char_width,
+            line_height,
+            baseline,
+            padding_x: 8,  // 터미널 좌측 패딩
+            padding_y: 8,  // 터미널 상단 패딩
+        }
+    }
+    
+    /// 기본 메트릭 (11pt D2Coding)
+    pub fn default() -> Self {
+        Self::for_d2coding(11)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct FontConfig {
     pub family: String,

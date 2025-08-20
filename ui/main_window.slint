@@ -85,16 +85,25 @@ export struct ColorSegment {
     bg_r: int,
     bg_g: int,
     bg_b: int,
-    line: int,
-    start_col: int,
-    accumulated_x: int,  // 누적 X 위치 (픽셀)
-    text_width: int,     // 텍스트 폭 (픽셀)
+    x: int,      // Rust에서 계산된 절대 X 위치 (픽셀)
+    y: int,      // Rust에서 계산된 절대 Y 위치 (픽셀)
+    width: int,  // Rust에서 계산된 폭 (픽셀)
+    height: int, // Rust에서 계산된 높이 (픽셀)
+}
+
+export struct CursorInfo {
+    x: int,      // Rust에서 계산된 커서 X 위치 (픽셀)
+    y: int,      // Rust에서 계산된 커서 Y 위치 (픽셀)
+    width: int,  // 커서 폭 (픽셀)
+    height: int, // 커서 높이 (픽셀)
+    visible: bool, // 커서 가시성
 }
 
 export component TerminalView inherits Rectangle {
     in-out property <TerminalState> state;
     in-out property <string> terminal_content: "";
     in-out property <[ColorSegment]> color_segments: [];
+    in-out property <CursorInfo> cursor_info: { x: 0, y: 0, width: 8, height: 16, visible: true };
     in-out property <bool> has_selection: false;
     in-out property <string> selected_text: "";
     
@@ -107,8 +116,7 @@ export component TerminalView inherits Rectangle {
     
     ScrollView {
         viewport-width: parent.width;
-        viewport-height: parent.height;
-        
+        viewport-height: parent.height;        
         Rectangle {
             width: 100%;
             height: max(self.preferred-height, parent.visible-height);
@@ -127,14 +135,13 @@ export component TerminalView inherits Rectangle {
             // 기본 터미널 내용 표시 (색상 세그먼트가 없을 때만)
             
             
-            // 색상 세그먼트들을 배경색과 함께 렌더링 (누적 위치 사용)
+            // 색상 세그먼트들을 배경색과 함께 렌더링 (Rust에서 계산된 위치 사용)
             for segment[i] in color_segments: Rectangle {
-                x: 8px + segment.accumulated_x * 1px;  // 누적 X 위치 사용
-                y: 8px + segment.line * 16px;  // 줄 간격 16px
-                width: segment.text_width * 1px;  // 실제 텍스트 폭 사용
-                height: 16px;
+                x: segment.x * 1px;      // Rust에서 계산된 절대 X 위치
+                y: segment.y * 1px;      // Rust에서 계산된 절대 Y 위치
+                //width: segment.width * 1px;  // Rust에서 계산된 폭
+                height: segment.height * 1px; // Rust에서 계산된 높이
                 background: rgb(segment.bg_r, segment.bg_g, segment.bg_b);
-                visible: segment.text != "\n";  // 줄바꿈 문자는 숨김
                 
                 Text {
                     text: segment.text;
@@ -152,12 +159,12 @@ export component TerminalView inherits Rectangle {
             }
             
             
-            // Cursor
-            Rectangle {
-                x: 8px + state.cursor_x * 8px;
-                y: 8px + state.cursor_y * state.font_size * 1px;
-                width: 8px;
-                height: state.font_size * 1px;
+            // Cursor (Rust에서 계산된 위치 사용)
+            if cursor_info.visible: Rectangle {
+                x: cursor_info.x * 1px;      // Rust에서 계산된 절대 X 위치
+                y: cursor_info.y * 1px;      // Rust에서 계산된 절대 Y 위치
+                width: cursor_info.width * 1px;   // Rust에서 계산된 폭
+                height: cursor_info.height * 1px; // Rust에서 계산된 높이
                 background: white;
                 opacity: 0.8;
                 
@@ -244,6 +251,7 @@ export component MainWindow inherits Window {
     };
     in-out property <string> terminal_content: "Welcome to STerm!\n$ ";
     in-out property <[ColorSegment]> color_segments: [];
+    in-out property <CursorInfo> cursor_info: { x: 8, y: 8, width: 8, height: 16, visible: true };
     
     callback tab_clicked(int);
     callback new_tab_clicked();
@@ -277,6 +285,7 @@ export component MainWindow inherits Window {
             state: terminal_state;
             terminal_content: terminal_content;
             color_segments: color_segments;
+            cursor_info: cursor_info;
             
             terminal_input(text) => {
                 terminal_input(text);

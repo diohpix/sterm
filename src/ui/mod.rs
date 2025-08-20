@@ -6,7 +6,8 @@ use std::sync::mpsc;
 use tokio::sync::Mutex;
 
 use crate::terminal::{SessionId, TerminalManager};
-use crate::{MainWindow, ColorSegment};
+use crate::utils::font::FontMetrics;
+use crate::{MainWindow, ColorSegment, CursorInfo};
 
 // UI 업데이트 메시지 타입
 #[derive(Debug, Clone)]
@@ -287,12 +288,13 @@ impl UIManager {
                                             if let Some(terminal_text) = tm.extract_session_terminal_text(session_id) {
                                                 log::debug!("Extracted terminal text for session {}: {:?}", session_id, terminal_text);
                                                 
-                                                // 색상 정보도 추출해서 로그 확인 (임시)
-                                                if let Some(colored_content) = tm.extract_session_colored_content(session_id) {
+                                                // 색상 정보도 추출해서 로그 확인 (임시) - 폰트 메트릭 사용
+                                                let font_metrics = FontMetrics::default(); // 임시로 기본값 사용
+                                                if let Some(colored_content) = tm.extract_session_colored_content(session_id, &font_metrics) {
                                                     log::debug!("Color segments for session {}: {} segments", session_id, colored_content.segments.len());
                                                     if colored_content.segments.len() > 0 {
                                                         for (i, segment) in colored_content.segments.iter().take(5).enumerate() {
-                                                            log::debug!("  Segment {}: '{}' fg:{:?} bg:{:?}", i, segment.text.chars().take(20).collect::<String>(), segment.fg_color, segment.bg_color);
+                                                            log::debug!("  Segment {}: '{}' x={} y={} w={} h={}", i, segment.text.chars().take(20).collect::<String>(), segment.x, segment.y, segment.width, segment.height);
                                                         }
                                                     }
                                                 }
@@ -316,12 +318,13 @@ impl UIManager {
                                                 if !terminal_text.is_empty() {
                                                     log::debug!("Terminal content updated on {:?} for session {}: {:?}", event, session_id, terminal_text);
                                                     
-                                                                                        // 색상 정보 추출 및 UI로 전송
-                                    if let Some(colored_content) = tm.extract_session_colored_content(session_id) {
+                                                                                        // 색상 정보 추출 및 UI로 전송 - 폰트 메트릭 사용
+                                    let font_metrics = FontMetrics::default(); // 임시로 기본값 사용
+                                    if let Some(colored_content) = tm.extract_session_colored_content(session_id, &font_metrics) {
                                         log::debug!("Color segments for session {} ({}): {} segments", session_id, match &event { alacritty_terminal::event::Event::Wakeup => "Wakeup", alacritty_terminal::event::Event::Title(_) => "Title", _ => "Other" }, colored_content.segments.len());
                                         if colored_content.segments.len() > 0 {
                                             for (i, segment) in colored_content.segments.iter().take(5).enumerate() {
-                                                log::debug!("  Segment {}: '{}' fg:{:?} bg:{:?}", i, segment.text.chars().take(20).collect::<String>(), segment.fg_color, segment.bg_color);
+                                                log::debug!("  Segment {}: '{}' x={} y={} w={} h={}", i, segment.text.chars().take(20).collect::<String>(), segment.x, segment.y, segment.width, segment.height);
                                             }
                                             
                                             // 색상 정보를 UI로 전송
@@ -393,7 +396,6 @@ impl UIManager {
                 loop {
                     match ui_update_receiver.recv() {
                         Ok(message) => {
-                            log::debug!("Received UI update message: {:?}", message);
                             
                             match message {
                                 UIUpdateMessage::TerminalContent { session_id, content } => {
@@ -410,35 +412,9 @@ impl UIManager {
                                 UIUpdateMessage::ColoredTerminalContent { session_id, segments } => {
                                     log::debug!("📗 Processing ColoredTerminalContent message for session {} with {} segments", session_id, segments.len());
                                     
-                                    // 각 세그먼트를 자세히 디버그 출력
-                                    for (i, seg) in segments.iter().enumerate() {
-                                        let text_preview = if seg.text.len() > 20 {
-                                            format!("{}...", &seg.text[..20])
-                                        } else {
-                                            seg.text.clone()
-                                        };
-                                        let text_escaped = text_preview.replace('\n', "\\n").replace('\r', "\\r").replace('\t', "\\t");
-                                        log::debug!("  Segment[{}]: text='{}' (len={}) fg=rgb({},{},{}) bg=rgb({},{},{}) line={} start_col={} end_col={}", 
-                                            i, 
-                                            text_escaped,
-                                            seg.text.len(),
-                                            seg.fg_color.r, seg.fg_color.g, seg.fg_color.b,
-                                            seg.bg_color.r, seg.bg_color.g, seg.bg_color.b,
-                                            seg.line, 
-                                            seg.start_col, 
-                                            seg.end_col
-                                        );
-                                    }
-                                    
-                                    // 색상 세그먼트를 Slint ColorSegment로 변환 (누적 위치 계산)
-                                    let mut accumulated_x_by_line: std::collections::HashMap<usize, i32> = std::collections::HashMap::new();
-                                    let slint_segments: Vec<ColorSegment> = segments.iter().enumerate().map(|(i, seg)| {
-                                        // 줄별 누적 X 위치 계산
-                                        let line = seg.line;
-                                        let current_line_x = accumulated_x_by_line.get(&line).unwrap_or(&0);
-                                        let text_width = (seg.text.chars().count() * 6) as i32;  // 6px per character
-                                        
-                                        let segment = ColorSegment {
+                                    // 세그먼트들을 간단히 Slint ColorSegment로 변환 (위치는 이미 계산됨)
+                                    let slint_segments: Vec<ColorSegment> = segments.iter().map(|seg| {
+                                        ColorSegment {
                                             text: seg.text.clone().into(),
                                             fg_r: seg.fg_color.r as i32,
                                             fg_g: seg.fg_color.g as i32,
@@ -446,42 +422,66 @@ impl UIManager {
                                             bg_r: seg.bg_color.r as i32,
                                             bg_g: seg.bg_color.g as i32,
                                             bg_b: seg.bg_color.b as i32,
-                                            line: seg.line as i32,
-                                            start_col: seg.start_col as i32,
-                                            accumulated_x: *current_line_x,
-                                            text_width,
-                                        };
-                                        
-                                        // 다음 세그먼트를 위해 누적 위치 업데이트
-                                        accumulated_x_by_line.insert(line, current_line_x + text_width);
-                                        
-                                        log::debug!("  -> Slint Segment[{}]: text='{}' fg=({},{},{}) bg=({},{},{}) line={} start_col={} acc_x={} width={}", 
-                                            i, 
-                                            segment.text.as_str().replace('\n', "\\n").replace('\r', "\\r").replace('\t', "\\t"),
-                                            segment.fg_r, segment.fg_g, segment.fg_b,
-                                            segment.bg_r, segment.bg_g, segment.bg_b,
-                                            segment.line, 
-                                            segment.start_col,
-                                            segment.accumulated_x,
-                                            segment.text_width
-                                        );
-                                        
-                                        segment
+                                            x: seg.x,      // 이미 계산된 절대 X 위치
+                                            y: seg.y,      // 이미 계산된 절대 Y 위치
+                                            width: seg.width,  // 이미 계산된 폭
+                                            height: seg.height, // 이미 계산된 높이
+                                        }
                                     }).collect();
                                     
-                                    // 색상 정보가 포함된 UI 업데이트
+                                    // 커서 위치 계산 (터미널에서 가져온 커서 정보 사용)
+                                    let terminal_manager_for_cursor = terminal_manager.clone();
+                                    let cursor_info = if let Ok(mut tm) = terminal_manager_for_cursor.try_lock() {
+                                        let font_metrics = FontMetrics::default(); // 임시로 기본값 사용
+                                        if let Some(colored_content) = tm.extract_session_colored_content(session_id, &font_metrics) {
+                                            let cursor_x = font_metrics.padding_x + (colored_content.cursor_col as i32) * font_metrics.char_width;
+                                            let cursor_y = font_metrics.padding_y + (colored_content.cursor_line as i32) * font_metrics.line_height;
+                                            
+                                            CursorInfo {
+                                                x: cursor_x,
+                                                y: cursor_y,
+                                                width: font_metrics.char_width,
+                                                height: font_metrics.line_height,
+                                                visible: true,
+                                            }
+                                        } else {
+                                            // 기본 커서 정보
+                                            let font_metrics = FontMetrics::default();
+                                            CursorInfo {
+                                                x: font_metrics.padding_x,
+                                                y: font_metrics.padding_y,
+                                                width: font_metrics.char_width,
+                                                height: font_metrics.line_height,
+                                                visible: true,
+                                            }
+                                        }
+                                    } else {
+                                        // 락을 획득할 수 없는 경우 기본값
+                                        let font_metrics = FontMetrics::default();
+                                        CursorInfo {
+                                            x: font_metrics.padding_x,
+                                            y: font_metrics.padding_y,
+                                            width: font_metrics.char_width,
+                                            height: font_metrics.line_height,
+                                            visible: true,
+                                        }
+                                    };
+                                    
+                                    // 색상 정보와 커서 정보가 포함된 UI 업데이트
                                     let window_weak = window_weak.clone();
                                     slint::invoke_from_event_loop(move || {
                                         if let Some(window) = window_weak.upgrade() {
-                                            // 기존 텍스트 설정 제거 - color_segments만 사용
-                                            let colored_text = Self::render_colored_segments(&segments);
-                                            log::debug!("📗 Rendered colored text ({} chars): {}", colored_text.len(), colored_text.chars().take(50).collect::<String>());
-                                            // window.set_terminal_content(colored_text.into()); // 제거: color_segments와 겹침
-                                            
                                             // 색상 세그먼트 설정
                                             let model = ModelRc::new(VecModel::from(slint_segments));
                                             window.set_color_segments(model);
-                                            log::debug!("📗 UI updated with colored terminal content for session {}: {} segments", session_id, segments.len());
+                                            
+                                            // 커서 정보 설정
+                                            let cursor_x = cursor_info.x;
+                                            let cursor_y = cursor_info.y;
+                                            window.set_cursor_info(cursor_info);
+                                            
+                                            log::debug!("📗 UI updated with colored terminal content for session {}: {} segments, cursor at ({}, {})", 
+                                                session_id, segments.len(), cursor_x, cursor_y);
                                         }
                                     }).unwrap_or_else(|e| log::error!("Failed to invoke colored UI update: {:?}", e));
                                 }

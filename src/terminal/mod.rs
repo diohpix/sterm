@@ -18,6 +18,7 @@ use tokio::sync::Mutex;
 
 use crate::config::Config;
 use crate::utils::color::{ColorTheme, Color};
+use crate::utils::font::FontMetrics;
 
 static SESSION_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -67,6 +68,11 @@ pub struct ColoredTextSegment {
     pub line: usize,
     pub start_col: usize,
     pub end_col: usize,
+    // UI 렌더링용 절대 위치 (폰트 메트릭으로 계산됨)
+    pub x: i32,      // 절대 X 위치 (픽셀)
+    pub y: i32,      // 절대 Y 위치 (픽셀)  
+    pub width: i32,  // 텍스트 폭 (픽셀)
+    pub height: i32, // 텍스트 높이 (픽셀)
 }
 
 /// Extracted terminal content with color information
@@ -300,7 +306,7 @@ impl TerminalSession {
     }
     
     /// Extract text with color information from terminal grid
-    pub fn extract_colored_terminal_content(&mut self) -> ColoredTerminalContent {
+    pub fn extract_colored_terminal_content(&mut self, font_metrics: &FontMetrics) -> ColoredTerminalContent {
         let session_id = self.id; // Copy id first to avoid borrow issues
         let content = self.sync();
         let grid = &content.grid;
@@ -317,6 +323,7 @@ impl TerminalSession {
         let mut current_fg = theme.foreground;
         let mut current_bg = theme.background;
         let mut segment_start_col = 0;
+        let mut accumulated_x_by_line: std::collections::HashMap<usize, i32> = std::collections::HashMap::new();
         
         for indexed in grid.display_iter() {
             let cell = indexed.cell;
@@ -350,6 +357,11 @@ impl TerminalSession {
             if line_num != current_line {
                 // 이전 줄의 마지막 세그먼트 추가
                 if !current_segment_text.is_empty() {
+                    let current_line_x = accumulated_x_by_line.get(&current_line).unwrap_or(&0);
+                    let text_width = (current_segment_text.chars().count() as i32) * font_metrics.char_width;
+                    let abs_x = font_metrics.padding_x + current_line_x;
+                    let abs_y = font_metrics.padding_y + (current_line as i32) * font_metrics.line_height;
+                    
                     line_segments.push(ColoredTextSegment {
                         text: current_segment_text.clone(),
                         fg_color: current_fg,
@@ -357,7 +369,14 @@ impl TerminalSession {
                         line: current_line,
                         start_col: segment_start_col,
                         end_col: segment_start_col + current_segment_text.chars().count(),
+                        x: abs_x,
+                        y: abs_y,
+                        width: text_width,
+                        height: font_metrics.line_height,
                     });
+                    
+                    // 누적 X 위치 업데이트
+                    accumulated_x_by_line.insert(current_line, current_line_x + text_width);
                 }
                 
                 // 줄별 세그먼트들을 메인 리스트에 추가
@@ -378,7 +397,12 @@ impl TerminalSession {
                                bg_color.r != current_bg.r || bg_color.g != current_bg.g || bg_color.b != current_bg.b;
             
             if colors_changed && !current_segment_text.is_empty() {
-                // 현재 세그먼트 저장
+                // 현재 세그먼트 저장 (절대 위치 계산 포함)
+                let current_line_x = accumulated_x_by_line.get(&current_line).unwrap_or(&0);
+                let text_width = (current_segment_text.chars().count() as i32) * font_metrics.char_width;
+                let abs_x = font_metrics.padding_x + current_line_x;
+                let abs_y = font_metrics.padding_y + (current_line as i32) * font_metrics.line_height;
+                
                 line_segments.push(ColoredTextSegment {
                     text: current_segment_text.clone(),
                     fg_color: current_fg,
@@ -386,7 +410,14 @@ impl TerminalSession {
                     line: current_line,
                     start_col: segment_start_col,
                     end_col: segment_start_col + current_segment_text.chars().count(),
+                    x: abs_x,
+                    y: abs_y,
+                    width: text_width,
+                    height: font_metrics.line_height,
                 });
+                
+                // 누적 X 위치 업데이트
+                accumulated_x_by_line.insert(current_line, current_line_x + text_width);
                 
                 // 새 세그먼트 시작
                 segment_start_col += current_segment_text.chars().count();
@@ -400,9 +431,14 @@ impl TerminalSession {
             line_text.push(ch);
         }
         
-        // 마지막 세그먼트 처리
+        // 마지막 세그먼트 처리 (절대 위치 계산 포함)
         if !current_segment_text.is_empty() {
             let text_len = current_segment_text.chars().count();
+            let current_line_x = accumulated_x_by_line.get(&current_line).unwrap_or(&0);
+            let text_width = (text_len as i32) * font_metrics.char_width;
+            let abs_x = font_metrics.padding_x + current_line_x;
+            let abs_y = font_metrics.padding_y + (current_line as i32) * font_metrics.line_height;
+            
             line_segments.push(ColoredTextSegment {
                 text: current_segment_text,
                 fg_color: current_fg,
@@ -410,6 +446,10 @@ impl TerminalSession {
                 line: current_line,
                 start_col: segment_start_col,
                 end_col: segment_start_col + text_len,
+                x: abs_x,
+                y: abs_y,
+                width: text_width,
+                height: font_metrics.line_height,
             });
         }
         segments.extend(line_segments);
@@ -424,14 +464,12 @@ impl TerminalSession {
                 seg.text.clone()
             };
             let text_escaped = text_preview.replace('\n', "\\n").replace('\r', "\\r").replace('\t', "\\t");
-            log::debug!("🎨 Generated Segment[{}]: text='{}' (len={}) fg=rgb({},{},{}) bg=rgb({},{},{}) line={} start_col={}", 
+            log::debug!("🎨 Generated Segment[{}]: text='{}' len={} line={} x={} y={} w={} h={}", 
                 i, 
                 text_escaped,
                 seg.text.len(),
-                seg.fg_color.r, seg.fg_color.g, seg.fg_color.b,
-                seg.bg_color.r, seg.bg_color.g, seg.bg_color.b,
-                seg.line, 
-                seg.start_col
+                seg.line,
+                seg.x, seg.y, seg.width, seg.height
             );
         }
         
@@ -635,9 +673,9 @@ impl TerminalManager {
         }
     }
     
-    pub fn extract_session_colored_content(&mut self, session_id: SessionId) -> Option<ColoredTerminalContent> {
+    pub fn extract_session_colored_content(&mut self, session_id: SessionId, font_metrics: &FontMetrics) -> Option<ColoredTerminalContent> {
         if let Some(session) = self.sessions.get_mut(&session_id) {
-            Some(session.extract_colored_terminal_content())
+            Some(session.extract_colored_terminal_content(font_metrics))
         } else {
             None
         }
