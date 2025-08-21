@@ -1,5 +1,5 @@
 use anyhow::Result;
-use slint::{Model, ModelRc, VecModel, Weak};
+use slint::{ComponentHandle, Model, ModelRc, VecModel, Weak};
 use std::sync::mpsc;
 use std::sync::Arc;
 // Duration import removed - no longer using timers
@@ -109,6 +109,7 @@ pub struct UIManager {
     ui_update_receiver: Option<mpsc::Receiver<UIUpdateMessage>>,
     korean_ime: Arc<Mutex<KoreanIME>>,
     last_control_key_time: Arc<Mutex<std::time::Instant>>,
+
 }
 
 impl UIManager {
@@ -124,7 +125,27 @@ impl UIManager {
             ui_update_receiver: Some(ui_update_receiver),
             korean_ime: Arc::new(Mutex::new(KoreanIME::new())),
             last_control_key_time: Arc::new(Mutex::new(std::time::Instant::now())),
+
         })
+    }
+
+    /// 윈도우 크기를 기반으로 터미널 크기를 계산하고 검증
+    fn calculate_terminal_size(window_width: i32, window_height: i32, font_size: i32) -> (u16, u16) {
+        let font_metrics = FontMetrics::for_d2coding(font_size);
+        
+        // TabBar 높이를 고려한 실제 터미널 영역 계산
+        let tab_bar_height = 32; // TabBar 높이 (main_window.slint에서 정의)
+        let available_height = window_height - tab_bar_height;
+        
+        // 패딩을 제외한 실제 사용 가능한 영역 계산
+        let usable_width = window_width - (font_metrics.padding_x * 2);
+        let usable_height = available_height - (font_metrics.padding_y * 2);
+        
+        // 터미널 크기 계산 및 제한 적용
+        let cols = std::cmp::max(10, std::cmp::min(300, (usable_width / font_metrics.char_width) as u16));
+        let rows = std::cmp::max(3, std::cmp::min(100, (usable_height / font_metrics.line_height) as u16));
+        
+        (cols, rows)
     }
 
     /// 색상 세그먼트들을 렌더링 가능한 텍스트로 변환
@@ -361,6 +382,54 @@ impl UIManager {
                 // 엔터키도 일반 IME 경로로 처리하도록 변경
                 // (기존 별도 처리 제거)
 
+                // 수동 리사이즈 단축키: Cmd+R (macOS) 또는 Ctrl+R (다른 OS)
+                if (event.modifiers.meta || event.modifiers.control) && event.text == "r" {
+                    let key_name = if event.modifiers.meta { "Cmd+R" } else { "Ctrl+R" };
+                    log::info!("🔄 Manual resize triggered by {}", key_name);
+                    eprintln!("🔄 Manual resize triggered by {}", key_name);
+                    
+                    let tm = terminal_manager.clone();
+                    let ww = window_weak.clone();
+                    
+                    // 윈도우 정보를 먼저 메인 스레드에서 가져오기
+                    if let Some(window) = ww.upgrade() {
+                        let font_size = window.get_terminal_state().font_size;
+                        
+                        // 실제 윈도우 크기 가져오기
+                        let window_size = window.window().size();
+                        let width = window_size.width as i32;
+                        let height = window_size.height as i32;
+                        
+                        let (cols, rows) = Self::calculate_terminal_size(width, height, font_size);
+                        
+                        log::info!("🔄 Manual resize: actual window {}x{} -> {}x{} chars", width, height, cols, rows);
+                        eprintln!("🔄 Manual resize: actual window {}x{} -> {}x{} chars", width, height, cols, rows);
+                        
+                        // 비동기 작업은 invoke_from_event_loop로 처리
+                        let terminal_manager = tm.clone();
+                        slint::invoke_from_event_loop(move || {
+                            tokio::spawn(async move {
+                                let mut terminal_manager = terminal_manager.lock().await;
+                                if let Some(active_session) = terminal_manager.get_active_session() {
+                                    let session_id = active_session.id;
+                                    
+                                    log::info!("📏 Resizing terminal session {} to {}x{} characters", 
+                                        session_id, cols, rows);
+                                        
+                                    if let Err(e) = terminal_manager.resize_session(session_id, cols, rows) {
+                                        log::error!("❌ Failed to manually resize terminal: {}", e);
+                                        eprintln!("❌ Failed to manually resize terminal: {}", e);
+                                    } else {
+                                        log::info!("✅ Manual terminal resize completed successfully: {}x{}", cols, rows);
+                                        eprintln!("✅ Manual terminal resize completed successfully: {}x{}", cols, rows);
+                                    }
+                                }
+                            });
+                        }).ok();
+                    }
+                    return;
+                }
+                
                 // tterm 스타일: modifier 키가 눌렸는데 텍스트가 비어있으면 무시
                 if (event.modifiers.control || event.modifiers.alt || event.modifiers.meta) && event.text.is_empty() {
                     log::debug!("Ignoring empty text event with modifier keys: ctrl:{}, alt:{}, meta:{}", 
@@ -474,26 +543,60 @@ impl UIManager {
 
 
 
-        // 윈도우 리사이즈 이벤트 핸들러
+        // 윈도우 리사이즈 이벤트 핸들러 (개선된 버전)
         {
             let terminal_manager = self.terminal_manager.clone();
+            let window_weak = self.window.clone();
+            let last_resize_time = Arc::new(Mutex::new(std::time::Instant::now()));
 
             window.on_window_resized(move |width, height| {
                 let terminal_manager = terminal_manager.clone();
+                let window_weak = window_weak.clone();
+                let last_resize_time = last_resize_time.clone();
+
+                log::info!("🔄 WINDOW RESIZE EVENT RECEIVED: {}x{}", width, height);
+                eprintln!("🔄 WINDOW RESIZE EVENT RECEIVED: {}x{}", width, height);
 
                 slint::invoke_from_event_loop(move || {
                     tokio::spawn(async move {
+                        // 디바운싱: 연속된 리사이즈 이벤트를 방지하기 위해 100ms 대기
+                        {
+                            let mut last_time = last_resize_time.lock().await;
+                            *last_time = std::time::Instant::now();
+                        }
+                        
+                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                        
+                        // 100ms 후에도 여전히 가장 최근 리사이즈라면 처리
+                        let should_process = {
+                            let last_time = last_resize_time.lock().await;
+                            last_time.elapsed() >= std::time::Duration::from_millis(100)
+                        };
+                        
+                        if !should_process {
+                            return;
+                        }
+
                         let mut tm = terminal_manager.lock().await;
                         if let Some(active_session) = tm.get_active_session() {
-                            // 터미널 크기를 문자 단위로 계산 (폰트 크기 기반)
-                            let char_width = 8; // 고정 폭 폰트 가정
-                            let char_height = 16; // 고정 높이 폰트 가정
-                            let cols = (width / char_width) as u16;
-                            let rows = (height / char_height) as u16;
-
+                            // 현재 폰트 설정을 가져오기 (기본값 사용)
+                            let font_size = if let Some(window) = window_weak.upgrade() {
+                                window.get_terminal_state().font_size
+                            } else {
+                                11 // 기본 폰트 크기
+                            };
+                            
+                            // 터미널 크기 계산
+                            let (cols, rows) = Self::calculate_terminal_size(width, height, font_size);
                             let session_id = active_session.id;
+                            
+                            log::debug!("Resizing terminal session {} to {}x{} characters ({}x{} pixels)", 
+                                session_id, cols, rows, width, height);
+                                
                             if let Err(e) = tm.resize_session(session_id, cols, rows) {
                                 log::error!("Failed to resize terminal: {}", e);
+                            } else {
+                                log::info!("Terminal resized successfully to {}x{} characters", cols, rows);
                             }
                         }
                     });
@@ -556,6 +659,11 @@ impl UIManager {
 
         // PTY 이벤트 처리 스레드 시작 (tterm 방식)
         self.start_pty_event_processing().await?;
+
+        // 네이티브 윈도우 리사이즈 콜백에 의존 (on_window_resized)
+        
+        // 수동 리사이즈 테스트를 위한 로깅 강화
+        log::info!("Window resize handlers are set up. Try resizing the window manually.");
 
         // UI 업데이트 처리 스레드 시작
         //self.start_ui_update_processing()?;
@@ -670,6 +778,8 @@ impl UIManager {
 
         Ok(())
     }
+
+
 
     async fn setup_initial_tabs(&self, window: &MainWindow) -> Result<()> {
         // 초기 탭 데이터 설정

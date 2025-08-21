@@ -284,9 +284,17 @@ export component TerminalView inherits Rectangle {
 
 export component MainWindow inherits Window {
     title: "STerm";
-    width: 800px;
-    height: 600px;
+    preferred-width: 1000px;
+    preferred-height: 700px;
+    min-width: 600px;
+    min-height: 400px;
+    max-width: 2400px;
+    max-height: 1800px;
     background: #1e1e1e;
+    
+    // 윈도우 크기 추적용 프로퍼티
+    property <length> current_width: self.width;
+    property <length> current_height: self.height;
     
     in-out property <[TabInfo]> tabs: [
         { title: "Terminal", active: true, id: 0 }
@@ -332,7 +340,7 @@ export component MainWindow inherits Window {
             }
         }
         
-        TerminalView {
+        terminal_view := TerminalView {
             state: terminal_state;
             terminal_content: terminal_content;
             color_segments: color_segments;
@@ -354,5 +362,14 @@ export component MainWindow inherits Window {
                 paste_clipboard();
             }
         }
+    }
+    
+    // 윈도우 크기 변경 감지 및 콜백 호출
+    changed current_width => {
+        window_resized(current_width / 1px, current_height / 1px);
+    }
+    
+    changed current_height => {
+        window_resized(current_width / 1px, current_height / 1px);
     }
 }
