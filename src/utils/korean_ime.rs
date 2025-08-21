@@ -145,10 +145,10 @@ impl KoreanIME {
                 } else {
                     // 조합 중이 아닐 때: ANSI escape sequence로 변환하여 전송
                     let ansi_seq = match ch {
-                        '\u{f700}' => "\x1b[A", // Up Arrow
-                        '\u{f701}' => "\x1b[B", // Down Arrow  
-                        '\u{f702}' => "\x1b[D", // Left Arrow
-                        '\u{f703}' => "\x1b[C", // Right Arrow
+                        '\u{f700}' => "\u{1b}OA", // Up Arrow
+                        '\u{f701}' => "\u{1b}OB", // Down Arrow  
+                        '\u{f702}' => "\u{1b}OD", // Left Arrow
+                        '\u{f703}' => "\u{1b}OC", // Right Arrow
                         _ => unreachable!(),
                     };
                     result.push_str(ansi_seq);
