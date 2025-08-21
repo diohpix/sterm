@@ -174,45 +174,38 @@ export component TerminalView inherits Rectangle {
                 }
             }
             
-            
-            // 조합 중인 문자가 있으면 텍스트로 표시
+            // 한글 조합 중인 텍스트 표시 (composition text)
             if state.composition_text != "": Rectangle {
                 x: cursor_info.x * 1px;
                 y: cursor_info.y * 1px;
-                width: cursor_info.width * 2px;
-                height: cursor_info.height * 1px;
-                background: red;  // 흰색 배경
+                width: cursor_info.width * 2px;   // Rust에서 계산된 폭
+                height: state.font_size * 1px;
+                background: rgba(255, 255, 0, 0.3); // 노란색 배경
                 
                 Text {
                     text: state.composition_text;
+                    color: black;
                     font-family: "D2Coding";
                     font-size: state.font_size * 1px;
-                    color: black;  // 검은색 글자
+                    x: 0;
+                    y: 0;
                     vertical-alignment: center;
-                    horizontal-alignment: center;
+                    horizontal-alignment: left;
                 }
             }
             
-            // 조합 중이 아닐 때만 커서 표시
+            // Cursor (Rust에서 계산된 위치 사용) - 조합 중이 아닐 때만 표시
             if cursor_info.visible && state.composition_text == "": Rectangle {
-                x: cursor_info.x * 1px;      
-                y: cursor_info.y * 1px;      
-                width: cursor_info.width * 1px;   
-                height: cursor_info.height * 1px; 
-                background: green;
+                x: cursor_info.x * 1px;      // Rust에서 계산된 절대 X 위치
+                y: cursor_info.y * 1px;      // Rust에서 계산된 절대 Y 위치
+                width: cursor_info.width * 1px;   // Rust에서 계산된 폭
+                height: cursor_info.height * 1px; // Rust에서 계산된 높이
+                background: white;
                 opacity: 0.8;
                 
                 animate opacity {
                     duration: 500ms;
                     iteration-count: -1;
-                }
-                Text {
-                    text: "";
-                    font-family: "D2Coding";
-                    font-size: state.font_size * 1px;
-                    color: black;  // 검은색 글자
-                    vertical-alignment: center;
-                    horizontal-alignment: center;
                 }
             }
         }
@@ -228,6 +221,13 @@ export component TerminalView inherits Rectangle {
         key-pressed(event) => {
             // 모든 키 이벤트를 Rust로 전달 (Rust에서 필터링 처리)
             debug(event);
+            
+            // ESC 키 특별 디버그
+            if (event.text == "\u{1b}") {
+                debug("ESC key detected in Slint UI! - CALLING terminal_input");
+            }
+            
+            // 모든 키 이벤트를 Rust로 전달
             terminal_input({
                 text: event.text,
                 modifiers: { 
@@ -242,7 +242,10 @@ export component TerminalView inherits Rectangle {
         }
         
         key-released(event) => {
-            // 필요한 경우 키 릴리즈 처리
+            // ESC 키 릴리즈에서는 처리하지 않음 (중복 방지)
+            if (event.text == "\u{1b}") {
+                debug("ESC key released in Slint UI! - NOT sending to avoid duplicates");
+            }
             accept
         }
     }

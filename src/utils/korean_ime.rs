@@ -28,12 +28,15 @@ impl KoreanInputState {
         self.is_composing = false;
     }
 
-    /// Get the currently composed character if it exists
+    /// Get the currently composed character if it exists (only for complete composition)
     pub fn get_current_char(&self) -> Option<char> {
         if let Some(cho) = self.chosung {
             let cho_idx = get_chosung_index(cho)?;
-            let jung_idx = self.jungsung.and_then(get_jungsung_index).unwrap_or(0);
+            
+            // 중성이 없으면 불완전한 조합이므로 None 반환
+            let jung_idx = self.jungsung.and_then(get_jungsung_index)?;
             let jong_idx = self.jongsung.and_then(get_jongsung_index).unwrap_or(0);
+            
             Some(compose_korean(cho_idx, jung_idx, jong_idx))
         } else {
             None
@@ -119,21 +122,66 @@ impl KoreanIME {
         }
 
         for ch in input_text.chars() {
-            if is_korean_jamo(ch) {
+            // macOS 방향키 처리
+            if matches!(ch, '\u{f700}' | '\u{f701}' | '\u{f702}' | '\u{f703}') {
+                if state.is_composing {
+                    // 조합 중: 불완전한 조합 상태인지 확인
+                    let is_incomplete = state.chosung.is_some() && state.jungsung.is_none();
+                    
+                    if is_incomplete {
+                        // 불완전한 상태: 자음만 출력
+                        if let Some(cho) = state.chosung {
+                            result.push(cho);
+                        }
+                    } else {
+                        // 완전한 조합: 조합된 문자 출력
+                        if let Some(composed) = state.get_current_char() {
+                            result.push(composed);
+                        }
+                    }
+                    state.reset();
+                    // 방향키는 무효화 (전송하지 않음)
+                    eprintln!("💫 macOS Arrow key during composition - completed composition, arrow key ignored");
+                } else {
+                    // 조합 중이 아닐 때: ANSI escape sequence로 변환하여 전송
+                    let ansi_seq = match ch {
+                        '\u{f700}' => "\x1b[A", // Up Arrow
+                        '\u{f701}' => "\x1b[B", // Down Arrow  
+                        '\u{f702}' => "\x1b[D", // Left Arrow
+                        '\u{f703}' => "\x1b[C", // Right Arrow
+                        _ => unreachable!(),
+                    };
+                    result.push_str(ansi_seq);
+                    eprintln!("💫 macOS Arrow key - converted to ANSI: {:?} -> {:?}", ch, ansi_seq);
+                }
+            } else if is_korean_jamo(ch) {
                 let completed = Self::process_korean_char(state, ch);
                 result.push_str(&completed);
             } else {
                 // Non-Korean character
                 if state.is_composing {
-                    // 조합 중일 때: 조합 문자열 완료
-                    if let Some(composed) = state.get_current_char() {
-                        result.push(composed);
+                    // 불완전한 조합 상태 (중성이 없음)인지 확인
+                    let is_incomplete = state.chosung.is_some() && state.jungsung.is_none();
+                    
+                    if is_incomplete {
+                        // 불완전한 상태: 자음만 출력
+                        if let Some(cho) = state.chosung {
+                            result.push(cho);
+                        }
+                    } else {
+                        // 완전한 조합: 조합된 문자 출력
+                        if let Some(composed) = state.get_current_char() {
+                            result.push(composed);
+                        }
                     }
                     state.reset();
                     
-                    // 엔터키, ESC는 조합만 완료하고 무효화
-                    if ch == '\r' || ch == '\n' || ch == '\u{1b}' {
-                        // 엔터키, ESC는 조합만 완료하고 전송하지 않음
+                    // 엔터키는 조합만 완료하고 무효화, ESC는 조합 완료 후 전송
+                    if ch == '\r' || ch == '\n' {
+                        // 엔터키는 조합만 완료하고 전송하지 않음
+                    } else if ch == '\u{1b}' {
+                        // ESC는 조합 완료 후 전송 (vi 모드 등을 위해)
+                        result.push(ch);
                     } else if ch == ' ' {
                         // 스페이스는 조합 완료 후 함께 전송
                         result.push(ch);
@@ -156,6 +204,9 @@ impl KoreanIME {
         } else {
             None
         };
+
+        log::debug!("KoreanIME::process_input result: {:?}, is_composing: {}, current_composition: {:?}", 
+                   result, state.is_composing, current_composition);
 
         (result, state.is_composing, current_composition)
     }

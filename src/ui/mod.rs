@@ -35,26 +35,10 @@ fn process_and_filter_terminal_input(event: &TerminalKeyEvent, korean_ime: &Arc<
                     return None;
                 }
             }
-            // macOS 특수 키 처리 (방향키 등)
-            '\u{f700}' => {
-                // Up Arrow - ANSI escape sequence로 변환
-                log::debug!("Converting macOS Up Arrow to ANSI: {:?} -> {:?}", ch, "\x1b[A");
-                return Some(("\x1b[A".to_string(), None));
-            }
-            '\u{f701}' => {
-                // Down Arrow - ANSI escape sequence로 변환
-                log::debug!("Converting macOS Down Arrow to ANSI: {:?} -> {:?}", ch, "\x1b[B");
-                return Some(("\x1b[B".to_string(), None));
-            }
-            '\u{f702}' => {
-                // Left Arrow - ANSI escape sequence로 변환
-                log::debug!("Converting macOS Left Arrow to ANSI: {:?} -> {:?}", ch, "\x1b[D");
-                return Some(("\x1b[D".to_string(), None));
-            }
-            '\u{f703}' => {
-                // Right Arrow - ANSI escape sequence로 변환
-                log::debug!("Converting macOS Right Arrow to ANSI: {:?} -> {:?}", ch, "\x1b[C");
-                return Some(("\x1b[C".to_string(), None));
+            // macOS 특수 키 처리 (방향키 등) - IME에서 처리하도록 이동
+            '\u{f700}' | '\u{f701}' | '\u{f702}' | '\u{f703}' => {
+                // macOS 방향키들은 IME에서 조합 상태를 확인 후 처리
+                // 여기서는 변환하지 않고 그대로 IME로 전달
             }
             // 기타 macOS 특수 키 범위는 필터링
             '\u{f704}'..='\u{f8ff}' => {
@@ -72,8 +56,8 @@ fn process_and_filter_terminal_input(event: &TerminalKeyEvent, korean_ime: &Arc<
             return None;
         }*/
         
-        // escape sequence 필터링
-        if input.starts_with('\u{1b}') {
+        // escape sequence 필터링 (단순 ESC는 제외)
+        if input.starts_with('\u{1b}') && input.chars().count() > 1 {
             log::debug!("Filtered escape sequence: {:?}", input);
             return None;
         }
@@ -86,14 +70,20 @@ fn process_and_filter_terminal_input(event: &TerminalKeyEvent, korean_ime: &Arc<
     }
     
     // 모든 입력에 대해 한국어 IME 처리
+    eprintln!("💫 ENTERING IME PROCESSING with: {:?}", input);
     if let Ok(mut ime) = korean_ime.try_lock() {
+        eprintln!("💫 IME LOCK SUCCESS - calling process_input");
         let (completed_text, _is_composing, current_composition) = ime.process_input(session_id, input);
+        eprintln!("💫 IME RESULT: completed_text={:?}, composition={:?}", completed_text, current_composition);
         if !completed_text.is_empty() {
+            eprintln!("💫 RETURNING NON-EMPTY: {:?}", completed_text);
             Some((completed_text, current_composition))
         } else {
+            eprintln!("💫 RETURNING EMPTY STRING");
             Some((String::new(), current_composition))
         }
     } else {
+        eprintln!("💫 IME LOCK FAILED - using raw input");
         Some((input.to_string(), None))
     }
 }
@@ -272,8 +262,57 @@ impl UIManager {
                 let window_weak = window_weak.clone();
                 let last_control_key_time = last_control_key_time.clone();
                 
+                eprintln!("🔥 BASIC INPUT EVENT: text={:?}, len={}, chars={}", 
+                    event.text, event.text.len(), event.text.chars().count());
+                    
+                // 엔터키 특별 디버깅
+                if event.text == "\n" || event.text == "\r" {
+                    eprintln!("🔥 ENTER KEY DETECTED! Checking processing path...");
+                }
                 log::debug!("Received terminal input event: text={:?}, modifiers={{alt:{}, ctrl:{}, meta:{}, shift:{}}}, repeat:{}", 
                     event.text, event.modifiers.alt, event.modifiers.control, event.modifiers.meta, event.modifiers.shift, event.repeat);
+                
+                // ESC 키 특별 처리 - 빈 텍스트일 때 ESC로 가정
+                if event.text.is_empty() && !event.modifiers.alt && !event.modifiers.control && !event.modifiers.meta && !event.modifiers.shift {
+                    log::debug!("Empty text event detected - assuming ESC key");
+                    // ESC 키 처리
+                    if let Ok(tm) = terminal_manager.try_lock() {
+                        if let Some(active_session) = tm.get_active_session() {
+                            let session_id = active_session.id;
+                            
+                            // 한글 조합 중인 경우 조합 완료 후 ESC 전송
+                            let was_composing = if let Ok(mut ime) = korean_ime.try_lock() {
+                                let composing = ime.terminal_states.get(&session_id).map(|state| state.is_composing).unwrap_or(false);
+                                if composing {
+                                    let (completed_text, _is_composing, current_composition) = ime.process_input(session_id, "\u{1b}");
+                                    if !completed_text.is_empty() {
+                                        let _ = tm.write_to_session(session_id, &completed_text);
+                                    }
+                                    
+                                    // UI 업데이트
+                                    if let Some(window) = window_weak.upgrade() {
+                                        // composition_text 직접 업데이트
+                                        let composition_str = current_composition.map(|c| c.to_string()).unwrap_or_default();
+                                        
+                                        // terminal_state 업데이트
+                                        let mut terminal_state = window.get_terminal_state();
+                                        terminal_state.composition_text = composition_str.into();
+                                        window.set_terminal_state(terminal_state);
+                                    }
+                                }
+                                composing
+                            } else { false };
+                            
+                            // ESC 전송 (조합 중이 아니었거나 조합 완료 후)
+                            if let Err(e) = tm.write_to_session(session_id, "\u{1b}") {
+                                log::error!("Failed to write ESC to session {}: {}", session_id, e);
+                            } else {
+                                log::debug!("ESC key sent to PTY for session {}", session_id);
+                            }
+                        }
+                    }
+                    return;
+                }
                 
                 // Control 키가 눌렸을 때 시간 기록
                 if event.modifiers.control {
@@ -319,49 +358,8 @@ impl UIManager {
                     return;
                 }
                 
-                if event.text == "\r" || event.text == "\n" { // Enter
-                    if let Ok(tm) = terminal_manager.try_lock() {
-                        if let Some(active_session) = tm.get_active_session() {
-                            let session_id = active_session.id;
-                            
-                            // 한글 조합 중인지 확인
-                            let was_composing = if let Ok(ime) = korean_ime.try_lock() {
-                                ime.terminal_states.get(&session_id)
-                                    .map(|state| state.is_composing)
-                                    .unwrap_or(false)
-                            } else {
-                                false
-                            };
-                            
-                            // 한글 조합 완료 (IME에서 이미 처리됨)
-                            if let Ok(mut ime) = korean_ime.try_lock() {
-                                if let Some(completed) = ime.finalize_composition(session_id) {
-                                    if let Err(e) = tm.write_to_session(session_id, &completed.to_string()) {
-                                        log::error!("Failed to write completed Korean char: {}", e);
-                                    }
-                                }
-                                
-                                // UI 업데이트 - 조합 완료로 composition_text 비우기
-                                if let Some(window) = window_weak.upgrade() {
-                                    let mut terminal_state = window.get_terminal_state();
-                                    terminal_state.composition_text = "".into();
-                                    window.set_terminal_state(terminal_state);
-                                    if was_composing {
-                                        log::debug!("Korean composition completed on Enter (Enter not sent)");
-                                    }
-                                }
-                            }
-                            
-                            // 조합 중이었으면 엔터 전송하지 않음, 조합 중이 아니었으면 엔터 전송
-                            if !was_composing {
-                                if let Err(e) = tm.write_to_session(session_id, "\r") {
-                                    log::error!("Failed to write enter to terminal: {}", e);
-                                }
-                            }
-                        }
-                    }
-                    return;
-                }
+                // 엔터키도 일반 IME 경로로 처리하도록 변경
+                // (기존 별도 처리 제거)
 
                 // tterm 스타일: modifier 키가 눌렸는데 텍스트가 비어있으면 무시
                 if (event.modifiers.control || event.modifiers.alt || event.modifiers.meta) && event.text.is_empty() {
@@ -433,19 +431,28 @@ impl UIManager {
                         }
                         
                         // 한글 IME 처리 및 필터링
+                        eprintln!("💫 CALLING process_and_filter_terminal_input with: {:?}", event.text);
                         let (filtered_input, current_composition) = match process_and_filter_terminal_input(&event, &korean_ime, session_id) {
-                            Some((processed, composition)) => (processed, composition),
+                            Some((processed, composition)) => {
+                                eprintln!("💫 PROCESSED: {:?} -> {:?}", event.text, processed);
+                                (processed, composition)
+                            },
                             None => {
-                                log::debug!("Filtered unsafe terminal input: {:?}", event.text);
+                                eprintln!("💫 FILTERED OUT: {:?}", event.text);
                                 return;
                             }
                         };
 
                         // 완성된 텍스트만 터미널로 전송
                         if !filtered_input.is_empty() {
+                            eprintln!("💫 WRITING TO PTY: {:?}", filtered_input);
                             if let Err(e) = tm.write_to_session(session_id, &filtered_input) {
-                                log::error!("Failed to write to terminal: {}", e);
+                                eprintln!("💫 PTY WRITE ERROR: {}", e);
+                            } else {
+                                eprintln!("💫 PTY WRITE SUCCESS!");
                             }
+                        } else {
+                            eprintln!("💫 EMPTY INPUT - NOT WRITING TO PTY");
                         }
                         
                         // 조합 중인 글자 UI 업데이트
@@ -785,8 +792,8 @@ impl UIManager {
             // Tab
             "\t" => Some(b"\t".to_vec()),
             
-            // Enter/Newline  
-            "\n" | "\r" => Some(b"\r".to_vec()), // Terminal prefers CR
+            // Enter/Newline - 일반 텍스트 경로로 처리하도록 특수키에서 제외
+            // "\n" | "\r" => Some(b"\r".to_vec()), // 주석 처리
             
             // Escape
             "\u{1B}" => Some(b"\x1b".to_vec()),
