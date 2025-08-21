@@ -29,8 +29,8 @@ fn process_and_filter_terminal_input(event: &TerminalKeyEvent, korean_ime: &Arc<
         match ch {
             // 나머지 제어 문자들은 필터링
             '\u{00}'..='\u{1f}' | '\u{7f}' => {
-                // 허용할 제어 문자들 제외
-                if !matches!(ch, '\n' | '\r' | '\t' | '\u{08}' | '\u{0c}') {
+                // 허용할 제어 문자들 제외 (ESC 포함)
+                if !matches!(ch, '\n' | '\r' | '\t' | '\u{08}' | '\u{0c}' | '\u{1b}') {
                     log::debug!("Filtered control character: {:?} (\\u{{{:04x}}})", ch, ch as u32);
                     return None;
                 }
@@ -63,7 +63,7 @@ fn process_and_filter_terminal_input(event: &TerminalKeyEvent, korean_ime: &Arc<
         }
         
         // 대부분 제어 문자로만 구성된 경우 필터링
-        if input.chars().all(|c| c.is_control() && !matches!(c, '\n' | '\r' | '\t' | '\u{08}' | '\u{0c}')) {
+        if input.chars().all(|c| c.is_control() && !matches!(c, '\n' | '\r' | '\t' | '\u{08}' | '\u{0c}' | '\u{1b}')) {
             log::debug!("Filtered control sequence: {:?}", input);
             return None;
         }
