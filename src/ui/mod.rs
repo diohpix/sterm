@@ -51,10 +51,10 @@ fn process_and_filter_terminal_input(event: &TerminalKeyEvent, korean_ime: &Arc<
         // 멀티바이트 문자열의 경우
         
         // macOS 특수 키들이 포함된 경우 필터링
-        if input.chars().any(|c| matches!(c, '\u{f700}'..='\u{f8ff}')) {
+     /*   if input.chars().any(|c| matches!(c, '\u{f700}'..='\u{f8ff}')) {
             log::debug!("Filtered macOS special key sequence: {:?}", input);
             return None;
-        }
+        }*/
         
         // escape sequence 필터링
         if input.starts_with('\u{1b}') {
@@ -313,7 +313,7 @@ impl UIManager {
                             }
                             
                             // Enter 전송
-                            if let Err(e) = tm.write_to_session(session_id, "\n") {
+                            if let Err(e) = tm.write_to_session(session_id, "\r") {
                                 log::error!("Failed to write enter to terminal: {}", e);
                             }
                         }
