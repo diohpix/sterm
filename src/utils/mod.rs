@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 pub mod color;
 pub mod font;
+pub mod korean_ime;
 pub mod platform;
 
 pub use color::*;

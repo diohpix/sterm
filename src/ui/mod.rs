@@ -7,10 +7,11 @@ use tokio::sync::Mutex;
 
 use crate::terminal::{SessionId, TerminalManager};
 use crate::utils::font::FontMetrics;
+use crate::utils::korean_ime::KoreanIME;
 use crate::{ColorSegment, CursorInfo, MainWindow, TerminalKeyEvent};
 
 /// 터미널로 전달하기에 안전한 키 입력인지 확인하고 필요시 변환  
-fn process_and_filter_terminal_input(event: &TerminalKeyEvent) -> Option<String> {
+fn process_and_filter_terminal_input(event: &TerminalKeyEvent, korean_ime: &Arc<Mutex<KoreanIME>>, session_id: SessionId) -> Option<(String, Option<char>)> {
     let input = &event.text.to_string();
     if input.is_empty() {
         log::debug!("Filtered: empty input");
@@ -25,13 +26,13 @@ fn process_and_filter_terminal_input(event: &TerminalKeyEvent) -> Option<String>
         let ch = input.chars().next().unwrap();
         match ch {
             // 일반적인 출력 가능한 ASCII 문자들
-            ' '..='~' => Some(input.to_string()),
+            ' '..='~' => Some((input.to_string(), None)),
             // 허용할 제어 문자들
-            '\n' | '\r' | '\t' | '\u{08}' => Some(input.to_string()), // Enter, CR, Tab, Backspace
+            '\n' | '\r' | '\t' | '\u{08}' => Some((input.to_string(), None)), // Enter, CR, Tab, Backspace
             // Ctrl+L (clear screen) 허용
             '\u{0c}' => {
                 log::debug!("Clear screen command detected (Ctrl+L)");
-                Some(input.to_string())
+                Some((input.to_string(), None))
             }
             // 나머지 제어 문자들은 필터링
             '\u{00}'..='\u{1f}' | '\u{7f}' => {
@@ -44,7 +45,7 @@ fn process_and_filter_terminal_input(event: &TerminalKeyEvent) -> Option<String>
                 None
             }
             // 기타 유니코드 문자들은 허용 (다국어 입력 지원)
-            _ => Some(input.to_string()),
+            _ => Some((input.to_string(), None)),
         }
     } else {
         // 멀티바이트 문자열의 경우
@@ -68,7 +69,16 @@ fn process_and_filter_terminal_input(event: &TerminalKeyEvent) -> Option<String>
         }
         
         // 일반적인 멀티바이트 문자열 허용 (유니코드, 복합 입력 등)
-        Some(input.to_string())
+        if let Ok(mut ime) = korean_ime.try_lock() {
+            let (completed_text, _is_composing, current_composition) = ime.process_input(session_id, input);
+            if !completed_text.is_empty() {
+                Some((completed_text, current_composition))
+            } else {
+                Some((String::new(), current_composition))
+            }
+        } else {
+            Some((input.to_string(), None))
+        }
     }
 }
 
@@ -91,6 +101,8 @@ pub struct UIManager {
     terminal_manager: Arc<Mutex<TerminalManager>>,
     ui_update_sender: mpsc::Sender<UIUpdateMessage>,
     ui_update_receiver: Option<mpsc::Receiver<UIUpdateMessage>>,
+    korean_ime: Arc<Mutex<KoreanIME>>,
+    last_control_key_time: Arc<Mutex<std::time::Instant>>,
 }
 
 impl UIManager {
@@ -104,6 +116,8 @@ impl UIManager {
             terminal_manager,
             ui_update_sender,
             ui_update_receiver: Some(ui_update_receiver),
+            korean_ime: Arc::new(Mutex::new(KoreanIME::new())),
+            last_control_key_time: Arc::new(Mutex::new(std::time::Instant::now())),
         })
     }
 
@@ -232,27 +246,143 @@ impl UIManager {
         // 터미널 입력 이벤트 핸들러
         {
             let terminal_manager = self.terminal_manager.clone();
+            let korean_ime = self.korean_ime.clone();
+            let window_weak = self.window.clone();
+            let last_control_key_time = self.last_control_key_time.clone();
 
             window.on_terminal_input(move |event| {
                 let terminal_manager = terminal_manager.clone();
+                let korean_ime = korean_ime.clone();
+                let window_weak = window_weak.clone();
+                let last_control_key_time = last_control_key_time.clone();
+                
                 log::debug!("Received terminal input event: text={:?}, modifiers={{alt:{}, ctrl:{}, meta:{}, shift:{}}}, repeat:{}", 
                     event.text, event.modifiers.alt, event.modifiers.control, event.modifiers.meta, event.modifiers.shift, event.repeat);
-
-                // 키 입력 필터링 - 안전한 입력만 터미널로 전달
-                let filtered_input = match process_and_filter_terminal_input(&event) {
-                    Some(processed) => processed,
-                    None => {
-                        log::debug!("Filtered unsafe terminal input: {:?}", event.text);
-                        return;
+                
+                // Control 키가 눌렸을 때 시간 기록
+                if event.modifiers.control {
+                    if let Ok(mut last_time) = last_control_key_time.try_lock() {
+                        *last_time = std::time::Instant::now();
                     }
-                };
+                }
 
-                // 별도 스레드 없이 바로 PTY에 쓰기
+                // tterm 스타일: 특수 키 처리 (백스페이스, 엔터, 스페이스 등)
+                if event.text == "\u{08}" { // Backspace
+                    if let Ok(tm) = terminal_manager.try_lock() {
+                        if let Some(active_session) = tm.get_active_session() {
+                            let session_id = active_session.id;
+                            
+                            // 한글 IME에서 백스페이스 처리
+                            if let Ok(mut ime) = korean_ime.try_lock() {
+                                let consumed = ime.handle_backspace(session_id);
+                                
+                                // 한글 조합 상태 업데이트
+                                let current_composition = ime.terminal_states.get(&session_id)
+                                    .and_then(|state| if state.is_composing { state.get_current_char() } else { None });
+                                
+                                // UI 업데이트
+                                if let Some(window) = window_weak.upgrade() {
+                                    // TODO: 조합 중인 글자 오버레이 업데이트
+                                    log::debug!("Korean composition overlay: {:?}", current_composition);
+                                }
+                                
+                                // IME가 처리하지 않은 경우만 터미널로 전송
+                                if !consumed {
+                                    if let Err(e) = tm.write_to_session(session_id, "\u{08}") {
+                                        log::error!("Failed to write backspace to terminal: {}", e);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return;
+                }
+                
+                if event.text == "\r" || event.text == "\n" { // Enter
+                    if let Ok(tm) = terminal_manager.try_lock() {
+                        if let Some(active_session) = tm.get_active_session() {
+                            let session_id = active_session.id;
+                            
+                            // 한글 조합 완료
+                            if let Ok(mut ime) = korean_ime.try_lock() {
+                                if let Some(completed) = ime.finalize_composition(session_id) {
+                                    if let Err(e) = tm.write_to_session(session_id, &completed.to_string()) {
+                                        log::error!("Failed to write completed Korean char: {}", e);
+                                    }
+                                }
+                            }
+                            
+                            // Enter 전송
+                            if let Err(e) = tm.write_to_session(session_id, "\n") {
+                                log::error!("Failed to write enter to terminal: {}", e);
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                // tterm 스타일: modifier 키가 눌렸는데 텍스트가 비어있으면 무시
+                if (event.modifiers.control || event.modifiers.alt || event.modifiers.meta) && event.text.is_empty() {
+                    log::debug!("Ignoring empty text event with modifier keys: ctrl:{}, alt:{}, meta:{}", 
+                        event.modifiers.control, event.modifiers.alt, event.modifiers.meta);
+                    return;
+                }
+                
+                // 특수키 및 Modifier 키 조합을 터미널 바이트로 변환
+                if let Some(key_bytes) = Self::convert_key_event_to_terminal_bytes(&event) {
+                    if let Ok(tm) = terminal_manager.try_lock() {
+                        if let Some(active_session) = tm.get_active_session() {
+                            let session_id = active_session.id;
+                            let bytes_str = String::from_utf8_lossy(&key_bytes);
+                            if let Err(e) = tm.write_to_session(session_id, &bytes_str) {
+                                log::error!("Failed to write key bytes to terminal: {}", e);
+                            } else {
+                                log::debug!("Sent key bytes: {:?} -> {}", key_bytes, bytes_str.escape_debug());
+                            }
+                        }
+                    } else {
+                        log::warn!("Could not acquire terminal manager lock for key: {:?}", event.text);
+                    };
+                    return; // 특수키/modifier는 일반 텍스트 처리하지 않음
+                }
+
+                // 일반 텍스트 입력 처리
                 if let Ok(tm) = terminal_manager.try_lock() {
                     if let Some(active_session) = tm.get_active_session() {
                         let session_id = active_session.id;
-                        if let Err(e) = tm.write_to_session(session_id, &filtered_input) {
-                            log::error!("Failed to write to terminal: {}", e);
+                        
+                        // Slint의 중복 이벤트 방지: Ctrl 키 직후의 텍스트 이벤트는 무시
+                        if !event.modifiers.control && !event.modifiers.alt && !event.modifiers.meta {
+                            if let Ok(last_time) = last_control_key_time.try_lock() {
+                                let elapsed = last_time.elapsed();
+                                if elapsed < std::time::Duration::from_millis(50) && event.text.len() == 1 {
+                                    // 최근 50ms 내에 control 키가 눌렸고 단일 문자라면 무시
+                                    log::debug!("Ignoring duplicate text event after Ctrl key: {:?}", event.text);
+                                    return;
+                                }
+                            }
+                        }
+                        
+                        // 한글 IME 처리 및 필터링
+                        let (filtered_input, current_composition) = match process_and_filter_terminal_input(&event, &korean_ime, session_id) {
+                            Some((processed, composition)) => (processed, composition),
+                            None => {
+                                log::debug!("Filtered unsafe terminal input: {:?}", event.text);
+                                return;
+                            }
+                        };
+
+                        // 완성된 텍스트만 터미널로 전송
+                        if !filtered_input.is_empty() {
+                            if let Err(e) = tm.write_to_session(session_id, &filtered_input) {
+                                log::error!("Failed to write to terminal: {}", e);
+                            }
+                        }
+                        
+                        // 조합 중인 글자 UI 업데이트
+                        if let Some(window) = window_weak.upgrade() {
+                            // TODO: 조합 중인 글자 오버레이 업데이트
+                            log::debug!("Korean composition overlay: {:?}", current_composition);
                         }
                     }
                 } else {
@@ -541,6 +671,250 @@ impl UIManager {
 
         let new_tabs_model = VecModel::from(tab_data);
         window.set_tabs(ModelRc::new(new_tabs_model));
+    }
+    
+    /// tterm 스타일: 키 이벤트를 터미널 바이트로 변환 (특수키 + modifier 조합)
+    fn convert_key_event_to_terminal_bytes(event: &TerminalKeyEvent) -> Option<Vec<u8>> {
+        let text = event.text.as_str();
+        
+        // 1. 먼저 특수키들을 처리 (텍스트와 무관한 키들)
+        if let Some(special_bytes) = Self::handle_special_keys(text) {
+            return Some(special_bytes);
+        }
+        
+        // 2. Ctrl 키 조합 처리 macOS에서는 meta
+        if event.modifiers.meta {
+            return Self::ctrl_key_to_bytes(text);
+        }
+        
+        // 3. Alt 키 조합 처리 (ESC + 키)  
+        if event.modifiers.alt {
+            return Self::alt_key_to_bytes(text);
+        }
+        
+        // 4. Meta (Cmd) 키는 보통 애플리케이션 단축키이므로 무시 macOs에서는 ctrl
+        if event.modifiers.control {
+            return None;
+        }
+        
+        None
+    }
+    
+    /// 특수키들을 터미널 바이트로 변환 (tterm 스타일)
+    fn handle_special_keys(text: &str) -> Option<Vec<u8>> {
+        match text {
+            // 백스페이스 (\u{08})
+            "\u{08}" => Some(vec![0x7F]), // DEL (127)
+            
+            // Tab
+            "\t" => Some(b"\t".to_vec()),
+            
+            // Enter/Newline  
+            "\n" | "\r" => Some(b"\r".to_vec()), // Terminal prefers CR
+            
+            // Escape
+            "\u{1B}" => Some(b"\x1b".to_vec()),
+            
+            // 화살표 키들 (ANSI escape sequences)
+            // 주의: 이 패턴들은 실제 키보드 입력에서는 잘 안나타나고
+            // 보통 Key 이벤트로 처리되지만, 대비해서 넣어둠
+            _ if text.starts_with("\u{1B}[") => {
+                match text {
+                    "\u{1B}[A" => Some(b"\x1b[A".to_vec()), // Up Arrow
+                    "\u{1B}[B" => Some(b"\x1b[B".to_vec()), // Down Arrow  
+                    "\u{1B}[C" => Some(b"\x1b[C".to_vec()), // Right Arrow
+                    "\u{1B}[D" => Some(b"\x1b[D".to_vec()), // Left Arrow
+                    "\u{1B}[3~" => Some(b"\x1b[3~".to_vec()), // Delete
+                    "\u{1B}[H" => Some(b"\x1b[H".to_vec()), // Home
+                    "\u{1B}[F" => Some(b"\x1b[F".to_vec()), // End
+                    "\u{1B}[5~" => Some(b"\x1b[5~".to_vec()), // Page Up
+                    "\u{1B}[6~" => Some(b"\x1b[6~".to_vec()), // Page Down
+                    _ => None,
+                }
+            }
+            
+            _ => None,
+        }
+    }
+    
+    /// tterm 스타일: 백스페이스 키 처리 (한글 IME 우선)
+    fn handle_backspace_key(
+        terminal_manager: &Arc<Mutex<TerminalManager>>,
+        korean_ime: &Arc<Mutex<KoreanIME>>,
+        window_weak: &Weak<MainWindow>
+    ) {
+        if let Ok(tm) = terminal_manager.try_lock() {
+            if let Some(active_session) = tm.get_active_session() {
+                let session_id = active_session.id;
+                
+                // 한글 IME에서 백스페이스 처리
+                if let Ok(mut ime) = korean_ime.try_lock() {
+                    let consumed = ime.handle_backspace(session_id);
+                    
+                    // 한글 조합 상태 업데이트
+                    let current_composition = ime.terminal_states.get(&session_id)
+                        .and_then(|state| if state.is_composing { 
+                            state.get_current_char() 
+                        } else { 
+                            None 
+                        });
+                    
+                    // UI 업데이트 (조합 중인 글자 표시)
+                    if let Some(_window) = window_weak.upgrade() {
+                        log::debug!("Korean composition after backspace: {:?}", current_composition);
+                    }
+                    
+                    // 한글 IME에서 처리했으면 터미널로 백스페이스 보내지 않음
+                    if consumed {
+                        return;
+                    }
+                }
+                
+                // 한글 IME에서 처리하지 않았으면 터미널로 백스페이스 전송
+                if let Err(e) = tm.write_to_session(session_id, "\u{7f}") {
+                    log::error!("Failed to write backspace to terminal: {}", e);
+                }
+            }
+        }
+    }
+    
+    /// tterm 스타일: 엔터 키 처리 (한글 조합 완료 후 엔터)
+    fn handle_enter_key(
+        terminal_manager: &Arc<Mutex<TerminalManager>>,
+        korean_ime: &Arc<Mutex<KoreanIME>>,
+        window_weak: &Weak<MainWindow>
+    ) {
+        if let Ok(tm) = terminal_manager.try_lock() {
+            if let Some(active_session) = tm.get_active_session() {
+                let session_id = active_session.id;
+                
+                // 한글 조합 완료 처리
+                if let Ok(mut ime) = korean_ime.try_lock() {
+                    if let Some(state) = ime.terminal_states.get_mut(&session_id) {
+                        if state.is_composing {
+                            if let Some(completed) = state.get_current_char() {
+                                // 조합 중인 글자 완성해서 터미널로 전송
+                                if let Err(e) = tm.write_to_session(session_id, &completed.to_string()) {
+                                    log::error!("Failed to write completed Korean char to terminal: {}", e);
+                                }
+                            }
+                            state.reset();
+                            
+                            // UI 업데이트
+                            if let Some(_window) = window_weak.upgrade() {
+                                log::debug!("Korean composition completed on Enter");
+                            }
+                        }
+                    }
+                }
+                
+                // Enter 전송
+                if let Err(e) = tm.write_to_session(session_id, "\r") {
+                    log::error!("Failed to write enter to terminal: {}", e);
+                }
+            }
+        }
+    }
+    
+    /// tterm 스타일: 스페이스 키 처리 (한글 조합 완료 후 스페이스)
+    fn handle_space_key(
+        terminal_manager: &Arc<Mutex<TerminalManager>>,
+        korean_ime: &Arc<Mutex<KoreanIME>>,
+        window_weak: &Weak<MainWindow>
+    ) {
+        if let Ok(tm) = terminal_manager.try_lock() {
+            if let Some(active_session) = tm.get_active_session() {
+                let session_id = active_session.id;
+                
+                // 한글 조합 완료 처리
+                if let Ok(mut ime) = korean_ime.try_lock() {
+                    if let Some(state) = ime.terminal_states.get_mut(&session_id) {
+                        if state.is_composing {
+                            if let Some(completed) = state.get_current_char() {
+                                // 조합 중인 글자 완성해서 터미널로 전송
+                                if let Err(e) = tm.write_to_session(session_id, &completed.to_string()) {
+                                    log::error!("Failed to write completed Korean char to terminal: {}", e);
+                                }
+                            }
+                            state.reset();
+                            
+                            // UI 업데이트
+                            if let Some(_window) = window_weak.upgrade() {
+                                log::debug!("Korean composition completed on Space");
+                            }
+                        }
+                    }
+                }
+                
+                // 스페이스 전송
+                if let Err(e) = tm.write_to_session(session_id, " ") {
+                    log::error!("Failed to write space to terminal: {}", e);
+                }
+            }
+        }
+    }
+    
+    /// Convert Ctrl key combinations to terminal control bytes  
+    fn ctrl_key_to_bytes(text: &str) -> Option<Vec<u8>> {
+        // Slint에서 Ctrl 키 조합 시 텍스트가 비어있을 수 있음을 고려
+        if text.is_empty() {
+            // Ctrl 키만 눌린 경우 - 일반적인 Ctrl 조합들 처리 불가
+            return None;
+        }
+        
+        // Single character Ctrl combinations
+        if text.len() == 1 {
+            let ch = text.chars().next()?;
+            match ch.to_ascii_lowercase() {
+                'a' => Some(b"\x01".to_vec()), // Ctrl+A
+                'b' => Some(b"\x02".to_vec()), // Ctrl+B  
+                'c' => Some(b"\x03".to_vec()), // Ctrl+C (SIGINT)
+                'd' => Some(b"\x04".to_vec()), // Ctrl+D (EOF)
+                'e' => Some(b"\x05".to_vec()), // Ctrl+E
+                'f' => Some(b"\x06".to_vec()), // Ctrl+F
+                'g' => Some(b"\x07".to_vec()), // Ctrl+G (Bell)
+                'h' => Some(b"\x08".to_vec()), // Ctrl+H (Backspace)
+                'i' => Some(b"\x09".to_vec()), // Ctrl+I (Tab)
+                'j' => Some(b"\x0a".to_vec()), // Ctrl+J (LF)
+                'k' => Some(b"\x0b".to_vec()), // Ctrl+K
+                'l' => Some(b"\x0c".to_vec()), // Ctrl+L (Clear screen)
+                'm' => Some(b"\x0d".to_vec()), // Ctrl+M (CR)
+                'n' => Some(b"\x0e".to_vec()), // Ctrl+N
+                'o' => Some(b"\x0f".to_vec()), // Ctrl+O
+                'p' => Some(b"\x10".to_vec()), // Ctrl+P
+                'q' => Some(b"\x11".to_vec()), // Ctrl+Q (XON)
+                'r' => Some(b"\x12".to_vec()), // Ctrl+R
+                's' => Some(b"\x13".to_vec()), // Ctrl+S (XOFF)
+                't' => Some(b"\x14".to_vec()), // Ctrl+T
+                'u' => Some(b"\x15".to_vec()), // Ctrl+U
+                'v' => Some(b"\x16".to_vec()), // Ctrl+V
+                'w' => Some(b"\x17".to_vec()), // Ctrl+W
+                'x' => Some(b"\x18".to_vec()), // Ctrl+X
+                'y' => Some(b"\x19".to_vec()), // Ctrl+Y
+                'z' => Some(b"\x1a".to_vec()), // Ctrl+Z (SIGTSTP)
+                '[' => Some(b"\x1b".to_vec()), // Ctrl+[ (ESC)
+                '\\' => Some(b"\x1c".to_vec()), // Ctrl+\
+                ']' => Some(b"\x1d".to_vec()), // Ctrl+]
+                '^' => Some(b"\x1e".to_vec()), // Ctrl+^
+                '_' => Some(b"\x1f".to_vec()), // Ctrl+_
+                ' ' => Some(b"\x00".to_vec()), // Ctrl+Space (NUL)
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+    
+    /// Convert Alt/Meta key combinations to escape sequences
+    fn alt_key_to_bytes(text: &str) -> Option<Vec<u8>> {
+        if !text.is_empty() {
+            // Alt+key sends ESC followed by the key
+            let mut result = vec![0x1b]; // ESC
+            result.extend_from_slice(text.as_bytes());
+            Some(result)
+        } else {
+            None
+        }
     }
 }
 
