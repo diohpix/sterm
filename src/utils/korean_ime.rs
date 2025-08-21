@@ -102,12 +102,25 @@ impl KoreanIME {
             } else {
                 // Non-Korean character
                 if state.is_composing {
-                    // 조합 중일 때: 조합을 완료하고 상태 해제만 하고, 입력된 문자는 무효화
+                    // 조합 중일 때: 조합 문자열 완료
                     if let Some(composed) = state.get_current_char() {
                         result.push(composed);
                     }
                     state.reset();
-                    // 한글이 아닌 문자는 입력하지 않음 (무효화)
+                    
+                    // 엔터키, ESC는 조합만 완료하고 무효화
+                    if ch == '\r' || ch == '\n' || ch == '\u{1b}' {
+                        // 엔터키, ESC는 조합만 완료하고 전송하지 않음
+                    } else if ch == ' ' {
+                        // 스페이스는 조합 완료 후 함께 전송
+                        result.push(ch);
+                    } else if !ch.is_control() {
+                        // 스페이스가 아닌 일반 문자는 함께 전송
+                        result.push(ch);
+                    } else {
+                        // 제어 문자는 정상 처리
+                        result.push(ch);
+                    }
                 } else {
                     // 조합 중이 아닐 때: 정상적으로 문자 입력
                     result.push(ch);

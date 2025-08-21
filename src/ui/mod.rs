@@ -21,31 +21,24 @@ fn process_and_filter_terminal_input(event: &TerminalKeyEvent, korean_ime: &Arc<
     // 완전히 공백으로만 구성된 문자열 필터링
     
     
-    // 단일 문자인 경우
+    // 먼저 필터링할 문자들을 체크
     if input.len() == 1 {
         let ch = input.chars().next().unwrap();
         match ch {
-            // 일반적인 출력 가능한 ASCII 문자들
-            ' '..='~' => Some((input.to_string(), None)),
-            // 허용할 제어 문자들
-            '\n' | '\r' | '\t' | '\u{08}' => Some((input.to_string(), None)), // Enter, CR, Tab, Backspace
-            // Ctrl+L (clear screen) 허용
-            '\u{0c}' => {
-                log::debug!("Clear screen command detected (Ctrl+L)");
-                Some((input.to_string(), None))
-            }
             // 나머지 제어 문자들은 필터링
             '\u{00}'..='\u{1f}' | '\u{7f}' => {
-                log::debug!("Filtered control character: {:?} (\\u{{{:04x}}})", ch, ch as u32);
-                None
+                // 허용할 제어 문자들 제외
+                if !matches!(ch, '\n' | '\r' | '\t' | '\u{08}' | '\u{0c}') {
+                    log::debug!("Filtered control character: {:?} (\\u{{{:04x}}})", ch, ch as u32);
+                    return None;
+                }
             }
             // macOS 특수 키 범위 필터링
             '\u{f700}'..='\u{f8ff}' => {
                 log::debug!("Filtered macOS special key: {:?} (\\u{{{:04x}}})", ch, ch as u32);
-                None
+                return None;
             }
-            // 기타 유니코드 문자들은 허용 (다국어 입력 지원)
-            _ => Some((input.to_string(), None)),
+            _ => {}
         }
     } else {
         // 멀티바이트 문자열의 경우
@@ -67,18 +60,18 @@ fn process_and_filter_terminal_input(event: &TerminalKeyEvent, korean_ime: &Arc<
             log::debug!("Filtered control sequence: {:?}", input);
             return None;
         }
-        
-        // 일반적인 멀티바이트 문자열 허용 (유니코드, 복합 입력 등)
-        if let Ok(mut ime) = korean_ime.try_lock() {
-            let (completed_text, _is_composing, current_composition) = ime.process_input(session_id, input);
-            if !completed_text.is_empty() {
-                Some((completed_text, current_composition))
-            } else {
-                Some((String::new(), current_composition))
-            }
+    }
+    
+    // 모든 입력에 대해 한국어 IME 처리
+    if let Ok(mut ime) = korean_ime.try_lock() {
+        let (completed_text, _is_composing, current_composition) = ime.process_input(session_id, input);
+        if !completed_text.is_empty() {
+            Some((completed_text, current_composition))
         } else {
-            Some((input.to_string(), None))
+            Some((String::new(), current_composition))
         }
+    } else {
+        Some((input.to_string(), None))
     }
 }
 
@@ -308,7 +301,16 @@ impl UIManager {
                         if let Some(active_session) = tm.get_active_session() {
                             let session_id = active_session.id;
                             
-                            // 한글 조합 완료
+                            // 한글 조합 중인지 확인
+                            let was_composing = if let Ok(ime) = korean_ime.try_lock() {
+                                ime.terminal_states.get(&session_id)
+                                    .map(|state| state.is_composing)
+                                    .unwrap_or(false)
+                            } else {
+                                false
+                            };
+                            
+                            // 한글 조합 완료 (IME에서 이미 처리됨)
                             if let Ok(mut ime) = korean_ime.try_lock() {
                                 if let Some(completed) = ime.finalize_composition(session_id) {
                                     if let Err(e) = tm.write_to_session(session_id, &completed.to_string()) {
@@ -321,13 +323,17 @@ impl UIManager {
                                     let mut terminal_state = window.get_terminal_state();
                                     terminal_state.composition_text = "".into();
                                     window.set_terminal_state(terminal_state);
-                                    log::debug!("Korean composition completed on Enter");
+                                    if was_composing {
+                                        log::debug!("Korean composition completed on Enter (Enter not sent)");
+                                    }
                                 }
                             }
                             
-                            // Enter 전송
-                            if let Err(e) = tm.write_to_session(session_id, "\r") {
-                                log::error!("Failed to write enter to terminal: {}", e);
+                            // 조합 중이었으면 엔터 전송하지 않음, 조합 중이 아니었으면 엔터 전송
+                            if !was_composing {
+                                if let Err(e) = tm.write_to_session(session_id, "\r") {
+                                    log::error!("Failed to write enter to terminal: {}", e);
+                                }
                             }
                         }
                     }
@@ -346,11 +352,41 @@ impl UIManager {
                     if let Ok(tm) = terminal_manager.try_lock() {
                         if let Some(active_session) = tm.get_active_session() {
                             let session_id = active_session.id;
-                            let bytes_str = String::from_utf8_lossy(&key_bytes);
-                            if let Err(e) = tm.write_to_session(session_id, &bytes_str) {
-                                log::error!("Failed to write key bytes to terminal: {}", e);
+                            
+                            // 조합 중인지 확인하고, 조합 중이면 조합만 완료하고 특수키는 무효화
+                            let was_composing = if let Ok(ime) = korean_ime.try_lock() {
+                                ime.terminal_states.get(&session_id)
+                                    .map(|state| state.is_composing)
+                                    .unwrap_or(false)
                             } else {
-                                log::debug!("Sent key bytes: {:?} -> {}", key_bytes, bytes_str.escape_debug());
+                                false
+                            };
+                            
+                            if was_composing {
+                                // 조합 중이면 조합만 완료하고 특수키는 전송하지 않음
+                                if let Ok(mut ime) = korean_ime.try_lock() {
+                                    if let Some(completed) = ime.finalize_composition(session_id) {
+                                        if let Err(e) = tm.write_to_session(session_id, &completed.to_string()) {
+                                            log::error!("Failed to write completed Korean char: {}", e);
+                                        }
+                                    }
+                                    
+                                    // UI 업데이트 - 조합 완료로 composition_text 비우기
+                                    if let Some(window) = window_weak.upgrade() {
+                                        let mut terminal_state = window.get_terminal_state();
+                                        terminal_state.composition_text = "".into();
+                                        window.set_terminal_state(terminal_state);
+                                        log::debug!("Korean composition completed on special key (key ignored)");
+                                    }
+                                }
+                            } else {
+                                // 조합 중이 아니면 정상적으로 특수키 전송
+                                let bytes_str = String::from_utf8_lossy(&key_bytes);
+                                if let Err(e) = tm.write_to_session(session_id, &bytes_str) {
+                                    log::error!("Failed to write key bytes to terminal: {}", e);
+                                } else {
+                                    log::debug!("Sent key bytes: {:?} -> {}", key_bytes, bytes_str.escape_debug());
+                                }
                             }
                         }
                     } else {
@@ -802,7 +838,7 @@ impl UIManager {
         }
     }
     
-    /// tterm 스타일: 엔터 키 처리 (한글 조합 완료 후 엔터)
+    /// tterm 스타일: 엔터 키 처리 (한글 조합 완료, 엔터는 조합 중이 아닐 때만 전송)
     fn handle_enter_key(
         terminal_manager: &Arc<Mutex<TerminalManager>>,
         korean_ime: &Arc<Mutex<KoreanIME>>,
@@ -811,6 +847,15 @@ impl UIManager {
         if let Ok(tm) = terminal_manager.try_lock() {
             if let Some(active_session) = tm.get_active_session() {
                 let session_id = active_session.id;
+                
+                // 한글 조합 중인지 확인
+                let was_composing = if let Ok(ime) = korean_ime.try_lock() {
+                    ime.terminal_states.get(&session_id)
+                        .map(|state| state.is_composing)
+                        .unwrap_or(false)
+                } else {
+                    false
+                };
                 
                 // 한글 조합 완료 처리
                 if let Ok(mut ime) = korean_ime.try_lock() {
@@ -829,15 +874,17 @@ impl UIManager {
                                 let mut terminal_state = window.get_terminal_state();
                                 terminal_state.composition_text = "".into();
                                 window.set_terminal_state(terminal_state);
-                                log::debug!("Korean composition completed on Enter");
+                                log::debug!("Korean composition completed on Enter (Enter not sent)");
                             }
                         }
                     }
                 }
                 
-                // Enter 전송
-                if let Err(e) = tm.write_to_session(session_id, "\r") {
-                    log::error!("Failed to write enter to terminal: {}", e);
+                // 조합 중이었으면 엔터 전송하지 않음, 조합 중이 아니었으면 엔터 전송
+                if !was_composing {
+                    if let Err(e) = tm.write_to_session(session_id, "\r") {
+                        log::error!("Failed to write enter to terminal: {}", e);
+                    }
                 }
             }
         }
