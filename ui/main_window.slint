@@ -7,6 +7,7 @@ export struct TerminalState {
     font_size: int,
     background_color: color,
     foreground_color: color,
+    composition_text: string,
 }
 
 export struct TabInfo {
@@ -174,18 +175,44 @@ export component TerminalView inherits Rectangle {
             }
             
             
-            // Cursor (Rust에서 계산된 위치 사용)
-            if cursor_info.visible: Rectangle {
-                x: cursor_info.x * 1px;      // Rust에서 계산된 절대 X 위치
-                y: cursor_info.y * 1px;      // Rust에서 계산된 절대 Y 위치
-                width: cursor_info.width * 1px;   // Rust에서 계산된 폭
-                height: cursor_info.height * 1px; // Rust에서 계산된 높이
-                background: white;
+            // 조합 중인 문자가 있으면 텍스트로 표시
+            if state.composition_text != "": Rectangle {
+                x: cursor_info.x * 1px;
+                y: cursor_info.y * 1px;
+                width: cursor_info.width * 2px;
+                height: cursor_info.height * 1px;
+                background: red;  // 흰색 배경
+                
+                Text {
+                    text: state.composition_text;
+                    font-family: "D2Coding";
+                    font-size: state.font_size * 1px;
+                    color: black;  // 검은색 글자
+                    vertical-alignment: center;
+                    horizontal-alignment: center;
+                }
+            }
+            
+            // 조합 중이 아닐 때만 커서 표시
+            if cursor_info.visible && state.composition_text == "": Rectangle {
+                x: cursor_info.x * 1px;      
+                y: cursor_info.y * 1px;      
+                width: cursor_info.width * 1px;   
+                height: cursor_info.height * 1px; 
+                background: green;
                 opacity: 0.8;
                 
                 animate opacity {
                     duration: 500ms;
                     iteration-count: -1;
+                }
+                Text {
+                    text: "";
+                    font-family: "D2Coding";
+                    font-size: state.font_size * 1px;
+                    color: black;  // 검은색 글자
+                    vertical-alignment: center;
+                    horizontal-alignment: center;
                 }
             }
         }

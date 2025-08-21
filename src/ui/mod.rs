@@ -278,12 +278,17 @@ impl UIManager {
                                 
                                 // 한글 조합 상태 업데이트
                                 let current_composition = ime.terminal_states.get(&session_id)
-                                    .and_then(|state| if state.is_composing { state.get_current_char() } else { None });
+                                    .and_then(|state| if state.is_composing { state.get_display_char() } else { None });
                                 
                                 // UI 업데이트
                                 if let Some(window) = window_weak.upgrade() {
-                                    // TODO: 조합 중인 글자 오버레이 업데이트
-                                    log::debug!("Korean composition overlay: {:?}", current_composition);
+                                    let mut terminal_state = window.get_terminal_state();
+                                    terminal_state.composition_text = current_composition
+                                        .map(|c| c.to_string())
+                                        .unwrap_or_default()
+                                        .into();
+                                    window.set_terminal_state(terminal_state);
+                                    log::debug!("Korean composition after backspace: {:?}", current_composition);
                                 }
                                 
                                 // IME가 처리하지 않은 경우만 터미널로 전송
@@ -309,6 +314,14 @@ impl UIManager {
                                     if let Err(e) = tm.write_to_session(session_id, &completed.to_string()) {
                                         log::error!("Failed to write completed Korean char: {}", e);
                                     }
+                                }
+                                
+                                // UI 업데이트 - 조합 완료로 composition_text 비우기
+                                if let Some(window) = window_weak.upgrade() {
+                                    let mut terminal_state = window.get_terminal_state();
+                                    terminal_state.composition_text = "".into();
+                                    window.set_terminal_state(terminal_state);
+                                    log::debug!("Korean composition completed on Enter");
                                 }
                             }
                             
@@ -381,8 +394,13 @@ impl UIManager {
                         
                         // 조합 중인 글자 UI 업데이트
                         if let Some(window) = window_weak.upgrade() {
-                            // TODO: 조합 중인 글자 오버레이 업데이트
-                            log::debug!("Korean composition overlay: {:?}", current_composition);
+                            let mut terminal_state = window.get_terminal_state();
+                            terminal_state.composition_text = current_composition
+                                .map(|c| c.to_string())
+                                .unwrap_or_default()
+                                .into();
+                            window.set_terminal_state(terminal_state);
+                            log::debug!("Korean composition updated: {:?}", current_composition);
                         }
                     }
                 } else {
@@ -754,13 +772,19 @@ impl UIManager {
                     // 한글 조합 상태 업데이트
                     let current_composition = ime.terminal_states.get(&session_id)
                         .and_then(|state| if state.is_composing { 
-                            state.get_current_char() 
+                            state.get_display_char() 
                         } else { 
                             None 
                         });
                     
                     // UI 업데이트 (조합 중인 글자 표시)
-                    if let Some(_window) = window_weak.upgrade() {
+                    if let Some(window) = window_weak.upgrade() {
+                        let mut terminal_state = window.get_terminal_state();
+                        terminal_state.composition_text = current_composition
+                            .map(|c| c.to_string())
+                            .unwrap_or_default()
+                            .into();
+                        window.set_terminal_state(terminal_state);
                         log::debug!("Korean composition after backspace: {:?}", current_composition);
                     }
                     
@@ -800,8 +824,11 @@ impl UIManager {
                             }
                             state.reset();
                             
-                            // UI 업데이트
-                            if let Some(_window) = window_weak.upgrade() {
+                            // UI 업데이트 - 조합 완료로 composition_text 비우기
+                            if let Some(window) = window_weak.upgrade() {
+                                let mut terminal_state = window.get_terminal_state();
+                                terminal_state.composition_text = "".into();
+                                window.set_terminal_state(terminal_state);
                                 log::debug!("Korean composition completed on Enter");
                             }
                         }
@@ -838,8 +865,11 @@ impl UIManager {
                             }
                             state.reset();
                             
-                            // UI 업데이트
-                            if let Some(_window) = window_weak.upgrade() {
+                            // UI 업데이트 - 조합 완료로 composition_text 비우기
+                            if let Some(window) = window_weak.upgrade() {
+                                let mut terminal_state = window.get_terminal_state();
+                                terminal_state.composition_text = "".into();
+                                window.set_terminal_state(terminal_state);
                                 log::debug!("Korean composition completed on Space");
                             }
                         }

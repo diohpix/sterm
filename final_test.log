@@ -1,0 +1,1185 @@
+warning: sterm@0.1.0: Exported component 'TabBar' doesn't inherit Window. No code will be generated for it
+warning: sterm@0.1.0:    --> /Users/xiphoid/git/sterm/ui/main_window.slint:21:18
+warning: sterm@0.1.0:     |
+warning: sterm@0.1.0: 21  | export component TabBar inherits Rectangle {
+warning: sterm@0.1.0:     |                  ^
+warning: sterm@0.1.0: Exported component 'TerminalView' doesn't inherit Window. No code will be generated for it
+warning: sterm@0.1.0:    --> /Users/xiphoid/git/sterm/ui/main_window.slint:120:18
+warning: sterm@0.1.0:     |
+warning: sterm@0.1.0: 120 | export component TerminalView inherits Rectangle {
+warning: sterm@0.1.0:     |                  ^
+warning: unused imports: `Column` and `Line`
+ --> src/terminal/mod.rs:5:13
+  |
+5 |     index::{Column, Line, Point},
+  |             ^^^^^^  ^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `color::*`
+ --> src/utils/mod.rs:9:9
+  |
+9 | pub use color::*;
+  |         ^^^^^^^^
+
+warning: unused import: `font::*`
+  --> src/utils/mod.rs:10:9
+   |
+10 | pub use font::*;
+   |         ^^^^^^^
+
+warning: unused import: `platform::*`
+  --> src/utils/mod.rs:11:9
+   |
+11 | pub use platform::*;
+   |         ^^^^^^^^^^^
+
+warning: unused variable: `filtered_input`
+   --> src/ui/mod.rs:304:34
+    |
+304 | ...                   let (filtered_input, current_composition) = match process_and_filter_terminal_input(&korean_event, &korean_ime, session_id) {
+    |                            ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_filtered_input`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `window`
+   --> src/ui/mod.rs:408:45
+    |
+408 | ...                   if let Some(window) = window_weak.upgrade() {
+    |                                   ^^^^^^ help: if this is intentional, prefix it with an underscore: `_window`
+
+warning: variable does not need to be mutable
+   --> src/ui/mod.rs:646:37
+    |
+646 | ...                   let mut tm = terminal_manager.lock().await;
+    |                           ----^^
+    |                           |
+    |                           help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: unused variable: `window_weak`
+   --> src/ui/mod.rs:846:17
+    |
+846 |             let window_weak = window_weak.clone();
+    |                 ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_window_weak`
+
+warning: unused variable: `content`
+   --> src/ui/mod.rs:845:73
+    |
+845 |         tm.set_ui_update_callback(Box::new(move |session_id: SessionId, content: String| {
+    |                                                                         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_content`
+
+warning: unused variable: `i`
+   --> src/terminal/mod.rs:494:14
+    |
+494 |         for (i, seg) in segments.iter().enumerate() {
+    |              ^ help: if this is intentional, prefix it with an underscore: `_i`
+
+warning: unused variable: `text_escaped`
+   --> src/terminal/mod.rs:501:17
+    |
+501 |             let text_escaped = text_preview
+    |                 ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_text_escaped`
+
+warning: enum `TerminalEvent` is never used
+  --> src/terminal/mod.rs:55:10
+   |
+55 | pub enum TerminalEvent {
+   |          ^^^^^^^^^^^^^
+   |
+   = note: `TerminalEvent` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` on by default
+
+warning: fields `line`, `start_col`, and `end_col` are never read
+  --> src/terminal/mod.rs:68:9
+   |
+64 | pub struct ColoredTextSegment {
+   |            ------------------ fields in this struct
+...
+68 |     pub line: usize,
+   |         ^^^^
+69 |     pub start_col: usize,
+   |         ^^^^^^^^^
+70 |     pub end_col: usize,
+   |         ^^^^^^^
+   |
+   = note: `ColoredTextSegment` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: fields `total_lines` and `total_cols` are never read
+  --> src/terminal/mod.rs:84:9
+   |
+80 | pub struct ColoredTerminalContent {
+   |            ---------------------- fields in this struct
+...
+84 |     pub total_lines: usize,
+   |         ^^^^^^^^^^^
+85 |     pub total_cols: usize,
+   |         ^^^^^^^^^^
+   |
+   = note: `ColoredTerminalContent` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: fields `title` and `content` are never read
+   --> src/terminal/mod.rs:147:9
+    |
+145 | pub struct TerminalSession {
+    |            --------------- fields in this struct
+146 |     pub id: SessionId,
+147 |     pub title: String,
+    |         ^^^^^
+...
+151 |     pub content: Arc<Mutex<String>>, // UI 렌더링용 콘텐츠
+    |         ^^^^^^^
+
+warning: methods `extract_terminal_text`, `get_content`, and `is_alive` are never used
+   --> src/terminal/mod.rs:292:12
+    |
+157 | impl TerminalSession {
+    | -------------------- methods in this implementation
+...
+292 |     pub fn extract_terminal_text(&mut self) -> String {
+    |            ^^^^^^^^^^^^^^^^^^^^^
+...
+555 |     pub async fn get_content(&self) -> String {
+    |                  ^^^^^^^^^^^
+...
+559 |     pub async fn is_alive(&self) -> bool {
+    |                  ^^^^^^^^
+
+warning: multiple methods are never used
+   --> src/terminal/mod.rs:596:12
+    |
+583 | impl TerminalManager {
+    | -------------------- methods in this implementation
+...
+596 |     pub fn set_ui_update_callback(&mut self, callback: UIUpdateCallback) {
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+...
+604 |     pub async fn process_pty_event(&mut self, session_id: SessionId, event: Event) {
+    |                  ^^^^^^^^^^^^^^^^^
+...
+649 |     pub fn process_pty_event_sync(&self, session_id: SessionId, event: Event) {
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+...
+696 |     pub fn update_session_content_and_get(
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+720 |     pub fn extract_session_terminal_text(&mut self, session_id: SessionId) -> Option<String> {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+764 |     pub fn get_session(&self, session_id: SessionId) -> Option<&TerminalSession> {
+    |            ^^^^^^^^^^^
+...
+768 |     pub fn get_session_mut(&mut self, session_id: SessionId) -> Option<&mut TerminalSession> {
+    |            ^^^^^^^^^^^^^^^
+...
+799 |     pub fn get_all_sessions(&self) -> Vec<SessionId> {
+    |            ^^^^^^^^^^^^^^^^
+...
+821 |     pub async fn get_terminal_content(&self, session_id: SessionId) -> Option<String> {
+    |                  ^^^^^^^^^^^^^^^^^^^^
+...
+829 |     pub async fn cleanup_dead_sessions(&mut self) {
+    |                  ^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `session_id` is never read
+   --> src/ui/mod.rs:125:9
+    |
+124 |     SessionClosed {
+    |     ------------- field in this variant
+125 |         session_id: SessionId,
+    |         ^^^^^^^^^^
+    |
+    = note: `UIUpdateMessage` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: variant `ColoredTerminalContent` is never constructed
+   --> src/ui/mod.rs:120:5
+    |
+119 | pub enum UIUpdateMessage {
+    |          --------------- variant in this enum
+120 |     ColoredTerminalContent {
+    |     ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `UIUpdateMessage` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `ui_update_receiver` is never read
+   --> src/ui/mod.rs:133:5
+    |
+129 | pub struct UIManager {
+    |            --------- field in this struct
+...
+133 |     ui_update_receiver: Option<mpsc::Receiver<UIUpdateMessage>>,
+    |     ^^^^^^^^^^^^^^^^^^
+
+warning: associated items `render_colored_segments`, `setup_ui_update_callback`, `handle_backspace_key`, `handle_enter_key`, and `handle_space_key` are never used
+    --> src/ui/mod.rs:155:8
+     |
+138  | impl UIManager {
+     | -------------- associated items in this implementation
+...
+155  |     fn render_colored_segments(segments: &[crate::terminal::ColoredTextSegment]) -> String {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+839  |     async fn setup_ui_update_callback(&self) -> Result<()> {
+     |              ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+983  |     fn handle_backspace_key(
+     |        ^^^^^^^^^^^^^^^^^^^^
+...
+1024 |     fn handle_enter_key(
+     |        ^^^^^^^^^^^^^^^^
+...
+1062 |     fn handle_space_key(
+     |        ^^^^^^^^^^^^^^^^
+
+warning: function `get_app_data_dir` is never used
+  --> src/utils/mod.rs:14:8
+   |
+14 | pub fn get_app_data_dir() -> Result<PathBuf> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: function `get_log_file_path` is never used
+  --> src/utils/mod.rs:22:8
+   |
+22 | pub fn get_log_file_path() -> Result<PathBuf> {
+   |        ^^^^^^^^^^^^^^^^^
+
+warning: function `is_valid_color` is never used
+  --> src/utils/mod.rs:28:8
+   |
+28 | pub fn is_valid_color(color: &str) -> bool {
+   |        ^^^^^^^^^^^^^^
+
+warning: function `format_bytes` is never used
+  --> src/utils/mod.rs:33:8
+   |
+33 | pub fn format_bytes(bytes: u64) -> String {
+   |        ^^^^^^^^^^^^
+
+warning: function `is_valid_utf8` is never used
+  --> src/utils/mod.rs:57:8
+   |
+57 | pub fn is_valid_utf8(bytes: &[u8]) -> bool {
+   |        ^^^^^^^^^^^^^
+
+warning: function `safe_truncate` is never used
+  --> src/utils/mod.rs:62:8
+   |
+62 | pub fn safe_truncate(s: &str, max_len: usize) -> &str {
+   |        ^^^^^^^^^^^^^
+
+warning: associated items `to_hex`, `to_slint_color`, and `from_slint_color` are never used
+  --> src/utils/color.rs:35:12
+   |
+12 | impl Color {
+   | ---------- associated items in this implementation
+...
+35 |     pub fn to_hex(&self) -> String {
+   |            ^^^^^^
+...
+39 |     pub fn to_slint_color(&self) -> slint::Color {
+   |            ^^^^^^^^^^^^^^
+...
+43 |     pub fn from_slint_color(color: slint::Color) -> Self {
+   |            ^^^^^^^^^^^^^^^^
+
+warning: field `selection` is never read
+  --> src/utils/color.rs:64:9
+   |
+60 | pub struct ColorTheme {
+   |            ---------- field in this struct
+...
+64 |     pub selection: Color,
+   |         ^^^^^^^^^
+
+warning: associated function `light_theme` is never used
+   --> src/utils/color.rs:115:12
+    |
+89  | impl ColorTheme {
+    | --------------- associated function in this implementation
+...
+115 |     pub fn light_theme() -> Self {
+    |            ^^^^^^^^^^^
+
+warning: field `baseline` is never read
+ --> src/utils/font.rs:8:9
+  |
+5 | pub struct FontMetrics {
+  |            ----------- field in this struct
+...
+8 |     pub baseline: i32,    // 베이스라인 오프셋
+  |         ^^^^^^^^
+  |
+  = note: `FontMetrics` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: fields `family`, `size`, `bold`, and `italic` are never read
+  --> src/utils/font.rs:38:9
+   |
+37 | pub struct FontConfig {
+   |            ---------- fields in this struct
+38 |     pub family: String,
+   |         ^^^^^^
+39 |     pub size: f32,
+   |         ^^^^
+40 |     pub bold: bool,
+   |         ^^^^
+41 |     pub italic: bool,
+   |         ^^^^^^
+   |
+   = note: `FontConfig` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: associated items `new`, `with_bold`, `with_italic`, `calculate_char_dimensions`, and `is_monospace` are never used
+  --> src/utils/font.rs:56:12
+   |
+55 | impl FontConfig {
+   | --------------- associated items in this implementation
+56 |     pub fn new(family: String, size: f32) -> Self {
+   |            ^^^
+...
+65 |     pub fn with_bold(mut self, bold: bool) -> Self {
+   |            ^^^^^^^^^
+...
+70 |     pub fn with_italic(mut self, italic: bool) -> Self {
+   |            ^^^^^^^^^^^
+...
+75 |     pub fn calculate_char_dimensions(&self) -> (f32, f32) {
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+83 |     pub fn is_monospace(&self) -> bool {
+   |            ^^^^^^^^^^^^
+
+warning: struct `FontManager` is never constructed
+   --> src/utils/font.rs:101:12
+    |
+101 | pub struct FontManager;
+    |            ^^^^^^^^^^^
+
+warning: associated functions `get_available_fonts`, `is_font_available`, `get_default_font`, `validate_font_size`, and `scale_font_size` are never used
+   --> src/utils/font.rs:104:12
+    |
+103 | impl FontManager {
+    | ---------------- associated functions in this implementation
+104 |     pub fn get_available_fonts() -> Vec<String> {
+    |            ^^^^^^^^^^^^^^^^^^^
+...
+121 |     pub fn is_font_available(font_name: &str) -> bool {
+    |            ^^^^^^^^^^^^^^^^^
+...
+127 |     pub fn get_default_font() -> FontConfig {
+    |            ^^^^^^^^^^^^^^^^
+...
+138 |     pub fn validate_font_size(size: f32) -> Result<f32> {
+    |            ^^^^^^^^^^^^^^^^^^
+...
+149 |     pub fn scale_font_size(current_size: f32, scale_factor: f32) -> f32 {
+    |            ^^^^^^^^^^^^^^^
+
+warning: variant `Bold` is never constructed
+   --> src/utils/font.rs:158:5
+    |
+156 | pub enum FontWeight {
+    |          ---------- variant in this enum
+157 |     Normal,
+158 |     Bold,
+    |     ^^^^
+    |
+    = note: `FontWeight` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: variant `Italic` is never constructed
+   --> src/utils/font.rs:164:5
+    |
+162 | pub enum FontStyle {
+    |          --------- variant in this enum
+163 |     Normal,
+164 |     Italic,
+    |     ^^^^^^
+    |
+    = note: `FontStyle` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: fields `weight`, `style`, `underline`, and `strikethrough` are never read
+   --> src/utils/font.rs:169:9
+    |
+168 | pub struct TextAttributes {
+    |            -------------- fields in this struct
+169 |     pub weight: FontWeight,
+    |         ^^^^^^
+170 |     pub style: FontStyle,
+    |         ^^^^^
+171 |     pub underline: bool,
+    |         ^^^^^^^^^
+172 |     pub strikethrough: bool,
+    |         ^^^^^^^^^^^^^
+    |
+    = note: `TextAttributes` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: multiple associated items are never used
+   --> src/utils/font.rs:187:12
+    |
+186 | impl TextAttributes {
+    | ------------------- associated items in this implementation
+187 |     pub fn new() -> Self {
+    |            ^^^
+...
+191 |     pub fn with_weight(mut self, weight: FontWeight) -> Self {
+    |            ^^^^^^^^^^^
+...
+196 |     pub fn with_style(mut self, style: FontStyle) -> Self {
+    |            ^^^^^^^^^^
+...
+201 |     pub fn with_underline(mut self, underline: bool) -> Self {
+    |            ^^^^^^^^^^^^^^
+...
+206 |     pub fn with_strikethrough(mut self, strikethrough: bool) -> Self {
+    |            ^^^^^^^^^^^^^^^^^^
+...
+211 |     pub fn is_bold(&self) -> bool {
+    |            ^^^^^^^
+...
+215 |     pub fn is_italic(&self) -> bool {
+    |            ^^^^^^^^^
+
+warning: method `remove_terminal` is never used
+  --> src/utils/korean_ime.rs:90:12
+   |
+77 | impl KoreanIME {
+   | -------------- method in this implementation
+...
+90 |     pub fn remove_terminal(&mut self, terminal_id: usize) {
+   |            ^^^^^^^^^^^^^^^
+
+warning: multiple associated functions are never used
+  --> src/utils/platform.rs:10:12
+   |
+8  | impl Platform {
+   | ------------- associated functions in this implementation
+9  |     /// 현재 플랫폼의 이름을 반환합니다.
+10 |     pub fn name() -> &'static str {
+   |            ^^^^
+...
+23 |     pub fn default_shell() -> String {
+   |            ^^^^^^^^^^^^^
+...
+34 |     pub fn config_dir() -> Result<PathBuf> {
+   |            ^^^^^^^^^^
+...
+43 |     pub fn data_dir() -> Result<PathBuf> {
+   |            ^^^^^^^^
+...
+52 |     pub fn cache_dir() -> Result<PathBuf> {
+   |            ^^^^^^^^^
+...
+87 |     pub fn show_notification(title: &str, message: &str) -> Result<()> {
+   |            ^^^^^^^^^^^^^^^^^
+...
+99 |     pub fn is_dark_mode() -> bool {
+   |            ^^^^^^^^^^^^
+
+warning: struct `SystemInfo` is never constructed
+   --> src/utils/platform.rs:166:12
+    |
+166 | pub struct SystemInfo {
+    |            ^^^^^^^^^^
+
+warning: associated functions `new`, `get_os_version`, `get_kernel_version`, `get_hostname`, and `get_username` are never used
+   --> src/utils/platform.rs:175:12
+    |
+174 | impl SystemInfo {
+    | --------------- associated functions in this implementation
+175 |     pub fn new() -> Result<Self> {
+    |            ^^^
+...
+185 |     fn get_os_version() -> Result<String> {
+    |        ^^^^^^^^^^^^^^
+...
+203 |     fn get_kernel_version() -> Result<String> {
+    |        ^^^^^^^^^^^^^^^^^^
+...
+213 |     fn get_hostname() -> Result<String> {
+    |        ^^^^^^^^^^^^
+...
+226 |     fn get_username() -> Result<String> {
+    |        ^^^^^^^^^^^^
+
+warning: function `show_notification` is never used
+   --> src/utils/platform.rs:137:12
+    |
+137 |     pub fn show_notification(title: &str, message: &str) -> Result<()> {
+    |            ^^^^^^^^^^^^^^^^^
+
+warning: function `is_dark_mode` is never used
+   --> src/utils/platform.rs:149:12
+    |
+149 |     pub fn is_dark_mode() -> bool {
+    |            ^^^^^^^^^^^^
+
+warning: `sterm` (bin "sterm") generated 45 warnings (run `cargo fix --bin "sterm"` to apply 5 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running `target/debug/sterm`
+[2025-08-21T01:41:04Z INFO  sterm] STerm starting...
+[2025-08-21T01:41:04Z INFO  sterm] Configuration loaded
+[2025-08-21T01:41:04Z INFO  sterm] Terminal manager created
+[2025-08-21T01:41:04Z INFO  sterm] UI manager created
+[2025-08-21T01:41:04Z INFO  sterm] Event handlers setup complete
+[2025-08-21T01:41:04Z INFO  sterm::terminal] Creating new terminal session 0 with shell: /bin/zsh
+[2025-08-21T01:41:04Z INFO  sterm::ui] Starting PTY event processor thread
+[2025-08-21T01:41:04Z DEBUG sterm::terminal] Terminal session 0 setup complete, waiting for PTY data
+[2025-08-21T01:41:04Z INFO  sterm::terminal] Terminal session 0 created successfully
+[2025-08-21T01:41:04Z INFO  sterm::terminal] Created new terminal session: 0
+[2025-08-21T01:41:04Z INFO  sterm] Initial terminal session created
+[2025-08-21T01:41:04Z INFO  sterm] Starting UI event loop
+[2025-08-21T01:41:04Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:04Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:04Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:41:04Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:04Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 40
+[2025-08-21T01:41:04Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 40 segments
+[2025-08-21T01:41:04Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:41:04Z DEBUG sterm::ui]   Segment 1: '                    ' x=8 y=21 w=720 h=13
+[2025-08-21T01:41:04Z DEBUG sterm::ui]   Segment 2: '                    ' x=8 y=34 w=720 h=13
+[2025-08-21T01:41:04Z DEBUG sterm::ui]   Segment 3: '                    ' x=8 y=47 w=720 h=13
+[2025-08-21T01:41:04Z DEBUG sterm::ui]   Segment 4: '                    ' x=8 y=60 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 40
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 40 segments
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 1: '                    ' x=8 y=21 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 2: '                    ' x=8 y=34 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 3: '                    ' x=8 y=47 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 4: '                    ' x=8 y=60 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] PTY event received for session 0: Title(xiphoid@NE13236mac:~/git/sterm)
+[2025-08-21T01:41:05Z DEBUG vte::ansi] [unhandled osc_dispatch]: [['1'],['~''/''g''i''t''/''s''t''e''r''m'],] at line 1284
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Received PTY event for session 0: Title(xiphoid@NE13236mac:~/git/sterm)
+other event: Title(xiphoid@NE13236mac:~/git/sterm)
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 40
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 40 segments
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 1: '                    ' x=8 y=21 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 2: '                    ' x=8 y=34 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 3: '                    ' x=8 y=47 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 4: '                    ' x=8 y=60 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG vte::ansi] [unhandled osc_dispatch]: [['7'],['f''i''l''e'':''/''/''N''E''1''3''2''3''6''m''a''c''.''l''o''c''a''l''/''U''s''e''r''s''/''x''i''p''h''o''i''d''/''g''i''t''/''s''t''e''r''m'],] at line 1284
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 40
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 40 segments
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 1: '                    ' x=8 y=21 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 2: '                    ' x=8 y=34 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 3: '                    ' x=8 y=47 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 4: '                    ' x=8 y=60 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 42
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 42 segments
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 4: '                    ' x=8 y=34 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:05Z DEBUG vte::ansi] [unhandled osc_dispatch]: [['1'],['~''/''g''i''t''/''s''t''e''r''m'],] at line 1284
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] PTY event received for session 0: Title(xiphoid@NE13236mac:~/git/sterm)
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 42
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 42 segments
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 4: '                    ' x=8 y=34 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 42
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 42 segments
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 4: '                    ' x=8 y=34 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:05Z DEBUG vte::ansi] [unhandled osc_dispatch]: [['7'],['f''i''l''e'':''/''/''N''E''1''3''2''3''6''m''a''c''.''l''o''c''a''l''/''U''s''e''r''s''/''x''i''p''h''o''i''d''/''g''i''t''/''s''t''e''r''m'],] at line 1284
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 42
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 42 segments
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 4: '                    ' x=8 y=34 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 44
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 44 segments
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 44
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 44 segments
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Received PTY event for session 0: Title(xiphoid@NE13236mac:~/git/sterm)
+other event: Title(xiphoid@NE13236mac:~/git/sterm)
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 44
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 44 segments
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 44
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 44 segments
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 44
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 44 segments
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 44
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 44 segments
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:05Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 49
+[2025-08-21T01:41:05Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 49 segments
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:41:05Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: q }
+[2025-08-21T01:41:25Z DEBUG sterm::ui] 🔤 Received terminal input event: text="q" (len=1, unicode="U+0071"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:41:25Z DEBUG sterm::ui] 🧪 Simulating Korean input 'ㅇ' for test
+[2025-08-21T01:41:25Z DEBUG sterm::ui] ✅ TEST IME processed: input='ㅇ' → processed='', composition=Some('ㅇ')
+[2025-08-21T01:41:25Z DEBUG sterm::ui] 🔄 TEST Force updating UI for Korean composition: Some('ㅇ')
+[2025-08-21T01:41:25Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:25Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 49
+[2025-08-21T01:41:25Z DEBUG sterm::ui] 🎨 TEST Adding composition segment: 'ㅇ' at (140, 34) with 49 existing segments
+[2025-08-21T01:41:25Z DEBUG sterm::ui] 🎨 TEST Total segments after adding composition: 50
+[2025-08-21T01:41:25Z DEBUG sterm::ui] 🎨 TEST UI updated with composition character
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text:   }
+[2025-08-21T01:41:53Z DEBUG sterm::ui] 🔤 Received terminal input event: text=" " (len=1, unicode="U+0020"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:41:53Z DEBUG sterm::ui] 🔧 Checking if special key conversion needed for: " "
+[2025-08-21T01:41:53Z DEBUG sterm::ui] 📝 Processing as general text input: " "
+[2025-08-21T01:41:53Z DEBUG sterm::ui] ✅ IME processed: input=' ' → processed=' ', composition=None
+[2025-08-21T01:41:53Z DEBUG sterm::terminal] Writing to PTY (session 0): " "
+[2025-08-21T01:41:53Z DEBUG sterm::ui] 🔄 Force updating UI for Korean composition: None
+[2025-08-21T01:41:53Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:53Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:53Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:53Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 49
+[2025-08-21T01:41:53Z DEBUG sterm::ui] ❌ No composition character to add
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text:   }
+[2025-08-21T01:41:54Z DEBUG sterm::ui] 🔤 Received terminal input event: text=" " (len=1, unicode="U+0020"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:41:54Z DEBUG sterm::ui] 🔧 Checking if special key conversion needed for: " "
+[2025-08-21T01:41:54Z DEBUG sterm::ui] 📝 Processing as general text input: " "
+[2025-08-21T01:41:54Z DEBUG sterm::ui] ✅ IME processed: input=' ' → processed=' ', composition=None
+[2025-08-21T01:41:54Z DEBUG sterm::terminal] Writing to PTY (session 0): " "
+[2025-08-21T01:41:54Z DEBUG sterm::ui] 🔄 Force updating UI for Korean composition: None
+[2025-08-21T01:41:54Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:54Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:54Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:54Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 49
+[2025-08-21T01:41:54Z DEBUG sterm::ui] ❌ No composition character to add
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: q }
+[2025-08-21T01:41:54Z DEBUG sterm::ui] 🔤 Received terminal input event: text="q" (len=1, unicode="U+0071"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:41:54Z DEBUG sterm::ui] 🧪 Simulating Korean input 'ㅇ' for test
+[2025-08-21T01:41:54Z DEBUG sterm::ui] ✅ TEST IME processed: input='ㅇ' → processed='아', composition=Some('ㅇ')
+[2025-08-21T01:41:54Z DEBUG sterm::ui] 🔄 TEST Force updating UI for Korean composition: Some('ㅇ')
+[2025-08-21T01:41:54Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:54Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 49
+[2025-08-21T01:41:54Z DEBUG sterm::ui] 🎨 TEST Adding composition segment: 'ㅇ' at (152, 34) with 49 existing segments
+[2025-08-21T01:41:54Z DEBUG sterm::ui] 🎨 TEST Total segments after adding composition: 50
+[2025-08-21T01:41:54Z DEBUG sterm::ui] 🎨 TEST UI updated with composition character
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: q }
+[2025-08-21T01:41:55Z DEBUG sterm::ui] 🔤 Received terminal input event: text="q" (len=1, unicode="U+0071"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:41:55Z DEBUG sterm::ui] 🧪 Simulating Korean input 'ㅇ' for test
+[2025-08-21T01:41:55Z DEBUG sterm::ui] ✅ TEST IME processed: input='ㅇ' → processed='아', composition=Some('ㅇ')
+[2025-08-21T01:41:55Z DEBUG sterm::ui] 🔄 TEST Force updating UI for Korean composition: Some('ㅇ')
+[2025-08-21T01:41:55Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:55Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 49
+[2025-08-21T01:41:55Z DEBUG sterm::ui] 🎨 TEST Adding composition segment: 'ㅇ' at (152, 34) with 49 existing segments
+[2025-08-21T01:41:55Z DEBUG sterm::ui] 🎨 TEST Total segments after adding composition: 50
+[2025-08-21T01:41:55Z DEBUG sterm::ui] 🎨 TEST UI updated with composition character
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: q }
+[2025-08-21T01:41:55Z DEBUG sterm::ui] 🔤 Received terminal input event: text="q" (len=1, unicode="U+0071"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:41:55Z DEBUG sterm::ui] 🧪 Simulating Korean input 'ㅇ' for test
+[2025-08-21T01:41:55Z DEBUG sterm::ui] ✅ TEST IME processed: input='ㅇ' → processed='아', composition=Some('ㅇ')
+[2025-08-21T01:41:55Z DEBUG sterm::ui] 🔄 TEST Force updating UI for Korean composition: Some('ㅇ')
+[2025-08-21T01:41:55Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:55Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 49
+[2025-08-21T01:41:55Z DEBUG sterm::ui] 🎨 TEST Adding composition segment: 'ㅇ' at (152, 34) with 49 existing segments
+[2025-08-21T01:41:55Z DEBUG sterm::ui] 🎨 TEST Total segments after adding composition: 50
+[2025-08-21T01:41:55Z DEBUG sterm::ui] 🎨 TEST UI updated with composition character
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: q }
+[2025-08-21T01:41:56Z DEBUG sterm::ui] 🔤 Received terminal input event: text="q" (len=1, unicode="U+0071"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:41:56Z DEBUG sterm::ui] 🧪 Simulating Korean input 'ㅇ' for test
+[2025-08-21T01:41:56Z DEBUG sterm::ui] ✅ TEST IME processed: input='ㅇ' → processed='아', composition=Some('ㅇ')
+[2025-08-21T01:41:56Z DEBUG sterm::ui] 🔄 TEST Force updating UI for Korean composition: Some('ㅇ')
+[2025-08-21T01:41:56Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:56Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 49
+[2025-08-21T01:41:56Z DEBUG sterm::ui] 🎨 TEST Adding composition segment: 'ㅇ' at (152, 34) with 49 existing segments
+[2025-08-21T01:41:56Z DEBUG sterm::ui] 🎨 TEST Total segments after adding composition: 50
+[2025-08-21T01:41:56Z DEBUG sterm::ui] 🎨 TEST UI updated with composition character
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: q }
+[2025-08-21T01:41:57Z DEBUG sterm::ui] 🔤 Received terminal input event: text="q" (len=1, unicode="U+0071"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:41:57Z DEBUG sterm::ui] 🧪 Simulating Korean input 'ㅇ' for test
+[2025-08-21T01:41:57Z DEBUG sterm::ui] ✅ TEST IME processed: input='ㅇ' → processed='아', composition=Some('ㅇ')
+[2025-08-21T01:41:57Z DEBUG sterm::ui] 🔄 TEST Force updating UI for Korean composition: Some('ㅇ')
+[2025-08-21T01:41:57Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:57Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 49
+[2025-08-21T01:41:57Z DEBUG sterm::ui] 🎨 TEST Adding composition segment: 'ㅇ' at (152, 34) with 49 existing segments
+[2025-08-21T01:41:57Z DEBUG sterm::ui] 🎨 TEST Total segments after adding composition: 50
+[2025-08-21T01:41:57Z DEBUG sterm::ui] 🎨 TEST UI updated with composition character
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: d }
+[2025-08-21T01:41:57Z DEBUG sterm::ui] 🔤 Received terminal input event: text="d" (len=1, unicode="U+0064"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:41:57Z DEBUG sterm::ui] 🔧 Checking if special key conversion needed for: "d"
+[2025-08-21T01:41:57Z DEBUG sterm::ui] 📝 Processing as general text input: "d"
+[2025-08-21T01:41:57Z DEBUG sterm::ui] ✅ IME processed: input='d' → processed='d', composition=None
+[2025-08-21T01:41:57Z DEBUG sterm::terminal] Writing to PTY (session 0): "d"
+[2025-08-21T01:41:57Z DEBUG sterm::ui] 🔄 Force updating UI for Korean composition: None
+[2025-08-21T01:41:57Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:57Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:57Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:57Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 49
+[2025-08-21T01:41:57Z DEBUG sterm::ui] ❌ No composition character to add
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: f }
+[2025-08-21T01:41:57Z DEBUG sterm::ui] 🔤 Received terminal input event: text="f" (len=1, unicode="U+0066"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:41:57Z DEBUG sterm::ui] 🔧 Checking if special key conversion needed for: "f"
+[2025-08-21T01:41:57Z DEBUG sterm::ui] 📝 Processing as general text input: "f"
+[2025-08-21T01:41:57Z DEBUG sterm::ui] ✅ IME processed: input='f' → processed='f', composition=None
+[2025-08-21T01:41:57Z DEBUG sterm::terminal] Writing to PTY (session 0): "f"
+[2025-08-21T01:41:57Z DEBUG sterm::ui] 🔄 Force updating UI for Korean composition: None
+[2025-08-21T01:41:57Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:57Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:57Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:57Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 49
+[2025-08-21T01:41:57Z DEBUG sterm::ui] ❌ No composition character to add
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: k }
+[2025-08-21T01:41:57Z DEBUG sterm::ui] 🔤 Received terminal input event: text="k" (len=1, unicode="U+006B"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:41:57Z DEBUG sterm::ui] 🔧 Checking if special key conversion needed for: "k"
+[2025-08-21T01:41:57Z DEBUG sterm::ui] 📝 Processing as general text input: "k"
+[2025-08-21T01:41:57Z DEBUG sterm::ui] ✅ IME processed: input='k' → processed='k', composition=None
+[2025-08-21T01:41:57Z DEBUG sterm::terminal] Writing to PTY (session 0): "k"
+[2025-08-21T01:41:57Z DEBUG sterm::ui] 🔄 Force updating UI for Korean composition: None
+[2025-08-21T01:41:57Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:57Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:57Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:57Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 49
+[2025-08-21T01:41:57Z DEBUG sterm::ui] ❌ No composition character to add
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: f }
+[2025-08-21T01:41:58Z DEBUG sterm::ui] 🔤 Received terminal input event: text="f" (len=1, unicode="U+0066"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:41:58Z DEBUG sterm::ui] 🔧 Checking if special key conversion needed for: "f"
+[2025-08-21T01:41:58Z DEBUG sterm::ui] 📝 Processing as general text input: "f"
+[2025-08-21T01:41:58Z DEBUG sterm::ui] ✅ IME processed: input='f' → processed='f', composition=None
+[2025-08-21T01:41:58Z DEBUG sterm::terminal] Writing to PTY (session 0): "f"
+[2025-08-21T01:41:58Z DEBUG sterm::ui] 🔄 Force updating UI for Korean composition: None
+[2025-08-21T01:41:58Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:58Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:58Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:58Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 49
+[2025-08-21T01:41:58Z DEBUG sterm::ui] ❌ No composition character to add
+{ modifiers: { alt: false, control: true, meta: false, shift: false }, repeat: false, text:  }
+[2025-08-21T01:41:58Z DEBUG sterm::ui] 🔤 Received terminal input event: text="\u{11}" (len=1, unicode="U+0011"), modifiers={alt:false, ctrl:true, meta:false, shift:false}, repeat:false
+[2025-08-21T01:41:58Z DEBUG sterm::ui] 🔧 Checking if special key conversion needed for: "\u{11}"
+[2025-08-21T01:41:58Z DEBUG sterm::ui] 📝 Processing as general text input: "\u{11}"
+[2025-08-21T01:41:58Z DEBUG sterm::ui] Filtered control character: '\u{11}' (\u{0011})
+[2025-08-21T01:41:58Z DEBUG sterm::ui] ❌ Filtered unsafe terminal input: "\u{11}"
+2025-08-21 10:41:58.594 sterm[43200:4680623] error messaging the mach port for IMKCFRunLoopWakeUpReliable
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: ㅇ }
+[2025-08-21T01:41:58Z DEBUG sterm::ui] 🔤 Received terminal input event: text="ㅇ" (len=3, unicode="U+3147"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:41:58Z DEBUG sterm::ui] 🔧 Checking if special key conversion needed for: "ㅇ"
+[2025-08-21T01:41:58Z DEBUG sterm::ui] 📝 Processing as general text input: "ㅇ"
+[2025-08-21T01:41:58Z DEBUG sterm::ui] ✅ IME processed: input='ㅇ' → processed='아', composition=Some('ㅇ')
+[2025-08-21T01:41:58Z DEBUG sterm::terminal] Writing to PTY (session 0): "아"
+[2025-08-21T01:41:58Z DEBUG sterm::ui] 🔄 Force updating UI for Korean composition: Some('ㅇ')
+[2025-08-21T01:41:58Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:58Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:41:58Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:41:58Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 49
+[2025-08-21T01:41:58Z DEBUG sterm::ui] 🎨 Adding composition segment: 'ㅇ' at (176, 34) with 49 existing segments
+[2025-08-21T01:41:58Z DEBUG sterm::ui] ✨ Total segments after adding composition: 50
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: ㅏ }
+[2025-08-21T01:41:59Z DEBUG sterm::ui] 🔤 Received terminal input event: text="ㅏ" (len=3, unicode="U+314F"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:41:59Z DEBUG sterm::ui] 🔧 Checking if special key conversion needed for: "ㅏ"
+[2025-08-21T01:41:59Z DEBUG sterm::ui] 📝 Processing as general text input: "ㅏ"
+[2025-08-21T01:41:59Z DEBUG sterm::ui] ✅ IME processed: input='ㅏ' → processed='', composition=Some('아')
+[2025-08-21T01:41:59Z DEBUG sterm::ui] 🔄 Force updating UI for Korean composition: Some('아')
+[2025-08-21T01:41:59Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:41:59Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 49
+[2025-08-21T01:41:59Z DEBUG sterm::ui] 🎨 Adding composition segment: '아' at (188, 34) with 49 existing segments
+[2025-08-21T01:41:59Z DEBUG sterm::ui] ✨ Total segments after adding composition: 50
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: ㄴ }
+[2025-08-21T01:42:00Z DEBUG sterm::ui] 🔤 Received terminal input event: text="ㄴ" (len=3, unicode="U+3134"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:42:00Z DEBUG sterm::ui] 🔧 Checking if special key conversion needed for: "ㄴ"
+[2025-08-21T01:42:00Z DEBUG sterm::ui] 📝 Processing as general text input: "ㄴ"
+[2025-08-21T01:42:00Z DEBUG sterm::ui] ✅ IME processed: input='ㄴ' → processed='', composition=Some('안')
+[2025-08-21T01:42:00Z DEBUG sterm::ui] 🔄 Force updating UI for Korean composition: Some('안')
+[2025-08-21T01:42:00Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:00Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 49
+[2025-08-21T01:42:00Z DEBUG sterm::ui] 🎨 Adding composition segment: '안' at (188, 34) with 49 existing segments
+[2025-08-21T01:42:00Z DEBUG sterm::ui] ✨ Total segments after adding composition: 50
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: 
+ }
+[2025-08-21T01:42:00Z DEBUG sterm::ui] 🔤 Received terminal input event: text="\n" (len=1, unicode="U+000A"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:42:00Z DEBUG sterm::terminal] Writing to PTY (session 0): "안"
+[2025-08-21T01:42:00Z DEBUG sterm::terminal] Writing to PTY (session 0): "\r"
+[2025-08-21T01:42:00Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:00Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:00Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:00Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:00Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:00Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:00Z DEBUG sterm::terminal] PTY event received for session 0: Title(dfkf아안)
+[2025-08-21T01:42:00Z DEBUG vte::ansi] [unhandled osc_dispatch]: [['1'],['d''f''k''f''ì''\u{95}''\u{84}''ì''\u{95}''\u{88}'],] at line 1284
+[2025-08-21T01:42:00Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:00Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 49
+[2025-08-21T01:42:00Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:00Z DEBUG vte::ansi] [unhandled osc_dispatch]: [['1'],['~''/''g''i''t''/''s''t''e''r''m'],] at line 1284
+[2025-08-21T01:42:00Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:00Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 49 segments
+[2025-08-21T01:42:00Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:00Z DEBUG sterm::terminal] PTY event received for session 0: Title(xiphoid@NE13236mac:~/git/sterm)
+[2025-08-21T01:42:00Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:00Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:00Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:00Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:00Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:42:00Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:00Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:00Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:01Z DEBUG vte::ansi] [unhandled osc_dispatch]: [['7'],['f''i''l''e'':''/''/''N''E''1''3''2''3''6''m''a''c''.''l''o''c''a''l''/''U''s''e''r''s''/''x''i''p''h''o''i''d''/''g''i''t''/''s''t''e''r''m'],] at line 1284
+[2025-08-21T01:42:01Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 49
+[2025-08-21T01:42:01Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 49 segments
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:01Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:01Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 56
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 56 segments
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Received PTY event for session 0: Title(dfkf아안)
+other event: Title(dfkf아안)
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:01Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:01Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 56
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 56 segments
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:01Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:01Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 56
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 56 segments
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:01Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:01Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 56
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 56 segments
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Received PTY event for session 0: Title(xiphoid@NE13236mac:~/git/sterm)
+other event: Title(xiphoid@NE13236mac:~/git/sterm)
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:01Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:01Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 56
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 56 segments
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:01Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:01Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 56
+[2025-08-21T01:42:01Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 56 segments
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:01Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: ㅇ }
+[2025-08-21T01:42:02Z DEBUG sterm::ui] 🔤 Received terminal input event: text="ㅇ" (len=3, unicode="U+3147"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:42:02Z DEBUG sterm::ui] 🔧 Checking if special key conversion needed for: "ㅇ"
+[2025-08-21T01:42:02Z DEBUG sterm::ui] 📝 Processing as general text input: "ㅇ"
+[2025-08-21T01:42:02Z DEBUG sterm::ui] ✅ IME processed: input='ㅇ' → processed='', composition=Some('ㅇ')
+[2025-08-21T01:42:02Z DEBUG sterm::ui] 🔄 Force updating UI for Korean composition: Some('ㅇ')
+[2025-08-21T01:42:02Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:02Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 56
+[2025-08-21T01:42:02Z DEBUG sterm::ui] 🎨 Adding composition segment: 'ㅇ' at (140, 60) with 56 existing segments
+[2025-08-21T01:42:02Z DEBUG sterm::ui] ✨ Total segments after adding composition: 57
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: ㅏ }
+[2025-08-21T01:42:02Z DEBUG sterm::ui] 🔤 Received terminal input event: text="ㅏ" (len=3, unicode="U+314F"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:42:02Z DEBUG sterm::ui] 🔧 Checking if special key conversion needed for: "ㅏ"
+[2025-08-21T01:42:02Z DEBUG sterm::ui] 📝 Processing as general text input: "ㅏ"
+[2025-08-21T01:42:02Z DEBUG sterm::ui] ✅ IME processed: input='ㅏ' → processed='', composition=Some('아')
+[2025-08-21T01:42:02Z DEBUG sterm::ui] 🔄 Force updating UI for Korean composition: Some('아')
+[2025-08-21T01:42:02Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:02Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 56
+[2025-08-21T01:42:02Z DEBUG sterm::ui] 🎨 Adding composition segment: '아' at (140, 60) with 56 existing segments
+[2025-08-21T01:42:02Z DEBUG sterm::ui] ✨ Total segments after adding composition: 57
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: ㄴ }
+[2025-08-21T01:42:02Z DEBUG sterm::ui] 🔤 Received terminal input event: text="ㄴ" (len=3, unicode="U+3134"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:42:02Z DEBUG sterm::ui] 🔧 Checking if special key conversion needed for: "ㄴ"
+[2025-08-21T01:42:02Z DEBUG sterm::ui] 📝 Processing as general text input: "ㄴ"
+[2025-08-21T01:42:02Z DEBUG sterm::ui] ✅ IME processed: input='ㄴ' → processed='', composition=Some('안')
+[2025-08-21T01:42:02Z DEBUG sterm::ui] 🔄 Force updating UI for Korean composition: Some('안')
+[2025-08-21T01:42:02Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:02Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 56
+[2025-08-21T01:42:02Z DEBUG sterm::ui] 🎨 Adding composition segment: '안' at (140, 60) with 56 existing segments
+[2025-08-21T01:42:02Z DEBUG sterm::ui] ✨ Total segments after adding composition: 57
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: ㄴ }
+[2025-08-21T01:42:03Z DEBUG sterm::ui] 🔤 Received terminal input event: text="ㄴ" (len=3, unicode="U+3134"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:42:03Z DEBUG sterm::ui] 🔧 Checking if special key conversion needed for: "ㄴ"
+[2025-08-21T01:42:03Z DEBUG sterm::ui] 📝 Processing as general text input: "ㄴ"
+[2025-08-21T01:42:03Z DEBUG sterm::ui] ✅ IME processed: input='ㄴ' → processed='안', composition=Some('ㄴ')
+[2025-08-21T01:42:03Z DEBUG sterm::terminal] Writing to PTY (session 0): "안"
+[2025-08-21T01:42:03Z DEBUG sterm::ui] 🔄 Force updating UI for Korean composition: Some('ㄴ')
+[2025-08-21T01:42:03Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:03Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:03Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:03Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 56
+[2025-08-21T01:42:03Z DEBUG sterm::ui] 🎨 Adding composition segment: 'ㄴ' at (140, 60) with 56 existing segments
+[2025-08-21T01:42:03Z DEBUG sterm::ui] ✨ Total segments after adding composition: 57
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: ㅇ }
+[2025-08-21T01:42:04Z DEBUG sterm::ui] 🔤 Received terminal input event: text="ㅇ" (len=3, unicode="U+3147"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:42:04Z DEBUG sterm::ui] 🔧 Checking if special key conversion needed for: "ㅇ"
+[2025-08-21T01:42:04Z DEBUG sterm::ui] 📝 Processing as general text input: "ㅇ"
+[2025-08-21T01:42:04Z DEBUG sterm::ui] ✅ IME processed: input='ㅇ' → processed='나', composition=Some('ㅇ')
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Writing to PTY (session 0): "나"
+[2025-08-21T01:42:04Z DEBUG sterm::ui] 🔄 Force updating UI for Korean composition: Some('ㅇ')
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 56
+[2025-08-21T01:42:04Z DEBUG sterm::ui] 🎨 Adding composition segment: 'ㅇ' at (152, 60) with 56 existing segments
+[2025-08-21T01:42:04Z DEBUG sterm::ui] ✨ Total segments after adding composition: 57
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: ㅕ }
+[2025-08-21T01:42:04Z DEBUG sterm::ui] 🔤 Received terminal input event: text="ㅕ" (len=3, unicode="U+3155"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:42:04Z DEBUG sterm::ui] 🔧 Checking if special key conversion needed for: "ㅕ"
+[2025-08-21T01:42:04Z DEBUG sterm::ui] 📝 Processing as general text input: "ㅕ"
+[2025-08-21T01:42:04Z DEBUG sterm::ui] ✅ IME processed: input='ㅕ' → processed='', composition=Some('여')
+[2025-08-21T01:42:04Z DEBUG sterm::ui] 🔄 Force updating UI for Korean composition: Some('여')
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 56
+[2025-08-21T01:42:04Z DEBUG sterm::ui] 🎨 Adding composition segment: '여' at (164, 60) with 56 existing segments
+[2025-08-21T01:42:04Z DEBUG sterm::ui] ✨ Total segments after adding composition: 57
+{ modifiers: { alt: false, control: false, meta: false, shift: false }, repeat: false, text: 
+ }
+[2025-08-21T01:42:04Z DEBUG sterm::ui] 🔤 Received terminal input event: text="\n" (len=1, unicode="U+000A"), modifiers={alt:false, ctrl:false, meta:false, shift:false}, repeat:false
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Writing to PTY (session 0): "여"
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Writing to PTY (session 0): "\r"
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG vte::ansi] [unhandled osc_dispatch]: [['1'],['ì''\u{95}''\u{88}''ë''\u{82}''\u{98}''ì''\u{97}''¬'],] at line 1284
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] PTY event received for session 0: Title(안나여)
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 56
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 56 segments
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 56
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 56 segments
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:04Z DEBUG vte::ansi] [unhandled osc_dispatch]: [['1'],['~''/''g''i''t''/''s''t''e''r''m'],] at line 1284
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] PTY event received for session 0: Title(xiphoid@NE13236mac:~/git/sterm)
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 56
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 56 segments
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Received PTY event for session 0: Title(안나여)
+other event: Title(안나여)
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 56
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 56 segments
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:04Z DEBUG vte::ansi] [unhandled osc_dispatch]: [['7'],['f''i''l''e'':''/''/''N''E''1''3''2''3''6''m''a''c''.''l''o''c''a''l''/''U''s''e''r''s''/''x''i''p''h''o''i''d''/''g''i''t''/''s''t''e''r''m'],] at line 1284
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 56
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 56 segments
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] PTY event received for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 56
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 56 segments
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Received PTY event for session 0: Title(xiphoid@NE13236mac:~/git/sterm)
+other event: Title(xiphoid@NE13236mac:~/git/sterm)
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 63
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 63 segments
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 63
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 63 segments
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 63
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 63 segments
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 63
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 63 segments
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Received PTY event for session 0: Wakeup
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Terminal content updated on Wakeup for session 0:
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Starting color extraction for session 0
+[2025-08-21T01:42:04Z DEBUG sterm::terminal] Color extraction completed for session 0. Total segments: 63
+[2025-08-21T01:42:04Z DEBUG sterm::ui] Color segments for session 0 (Wakeup): 63 segments
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 0: '                    ' x=8 y=8 w=720 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 1: '➜  ' x=8 y=21 w=18 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 2: 'sterm' x=26 y=21 w=30 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 3: '                    ' x=56 y=21 w=672 h=13
+[2025-08-21T01:42:04Z DEBUG sterm::ui]   Segment 4: '➜  ' x=8 y=34 w=18 h=13
+{ modifiers: { alt: false, control: true, meta: false, shift: false }, repeat: false, text:  }
+[2025-08-21T01:42:06Z DEBUG sterm::ui] 🔤 Received terminal input event: text="\u{11}" (len=1, unicode="U+0011"), modifiers={alt:false, ctrl:true, meta:false, shift:false}, repeat:false
+[2025-08-21T01:42:06Z DEBUG sterm::ui] 🔧 Checking if special key conversion needed for: "\u{11}"
+[2025-08-21T01:42:06Z DEBUG sterm::ui] 📝 Processing as general text input: "\u{11}"
+[2025-08-21T01:42:06Z DEBUG sterm::ui] Filtered control character: '\u{11}' (\u{0011})
+[2025-08-21T01:42:06Z DEBUG sterm::ui] ❌ Filtered unsafe terminal input: "\u{11}"

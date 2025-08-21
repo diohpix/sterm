@@ -39,6 +39,21 @@ impl KoreanInputState {
             None
         }
     }
+    
+    /// Get character for UI display - shows individual jamo for incomplete compositions
+    pub fn get_display_char(&self) -> Option<char> {
+        if let Some(cho) = self.chosung {
+            if let Some(_jung) = self.jungsung {
+                // Complete composition - use get_current_char
+                self.get_current_char()
+            } else {
+                // Only consonant - show the consonant itself
+                Some(cho)
+            }
+        } else {
+            None
+        }
+    }
 
     /// Handle backspace during composition
     pub fn handle_backspace(&mut self) {
@@ -85,19 +100,23 @@ impl KoreanIME {
                 let completed = Self::process_korean_char(state, ch);
                 result.push_str(&completed);
             } else {
-                // Non-Korean character - finalize any composition and add the character
+                // Non-Korean character
                 if state.is_composing {
+                    // 조합 중일 때: 조합을 완료하고 상태 해제만 하고, 입력된 문자는 무효화
                     if let Some(composed) = state.get_current_char() {
                         result.push(composed);
                     }
                     state.reset();
+                    // 한글이 아닌 문자는 입력하지 않음 (무효화)
+                } else {
+                    // 조합 중이 아닐 때: 정상적으로 문자 입력
+                    result.push(ch);
                 }
-                result.push(ch);
             }
         }
 
         let current_composition = if state.is_composing {
-            state.get_current_char()
+            state.get_display_char()
         } else {
             None
         };
