@@ -725,3 +725,9 @@ other event: Title(xiphoid@NE13236mac:~/git/sterm)
 [2025-08-21T01:39:46Z DEBUG sterm::ui] 📝 Processing as general text input: "\u{11}"
 [2025-08-21T01:39:46Z DEBUG sterm::ui] Filtered control character: '\u{11}' (\u{0011})
 [2025-08-21T01:39:46Z DEBUG sterm::ui] ❌ Filtered unsafe terminal input: "\u{11}"
+{ modifiers: { alt: false, control: true, meta: false, shift: false }, repeat: false, text:  }
+[2025-08-21T03:59:57Z DEBUG sterm::ui] 🔤 Received terminal input event: text="\u{11}" (len=1, unicode="U+0011"), modifiers={alt:false, ctrl:true, meta:false, shift:false}, repeat:false
+[2025-08-21T03:59:57Z DEBUG sterm::ui] 🔧 Checking if special key conversion needed for: "\u{11}"
+[2025-08-21T03:59:57Z DEBUG sterm::ui] 📝 Processing as general text input: "\u{11}"
+[2025-08-21T03:59:57Z DEBUG sterm::ui] Filtered control character: '\u{11}' (\u{0011})
+[2025-08-21T03:59:57Z DEBUG sterm::ui] ❌ Filtered unsafe terminal input: "\u{11}"

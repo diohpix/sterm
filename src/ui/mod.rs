@@ -13,6 +13,8 @@ use crate::{ColorSegment, CursorInfo, MainWindow, TerminalKeyEvent};
 /// 터미널로 전달하기에 안전한 키 입력인지 확인하고 필요시 변환  
 fn process_and_filter_terminal_input(event: &TerminalKeyEvent, korean_ime: &Arc<Mutex<KoreanIME>>, session_id: SessionId) -> Option<(String, Option<char>)> {
     let input = &event.text.to_string();
+    log::debug!("process_and_filter_terminal_input called with: {:?}", input);
+    
     if input.is_empty() {
         log::debug!("Filtered: empty input");
         return None;
@@ -21,8 +23,8 @@ fn process_and_filter_terminal_input(event: &TerminalKeyEvent, korean_ime: &Arc<
     // 완전히 공백으로만 구성된 문자열 필터링
     
     
-    // 먼저 필터링할 문자들을 체크
-    if input.len() == 1 {
+    // 먼저 필터링할 문자들을 체크 (단일 문자인지 확인)
+    if input.chars().count() == 1 {
         let ch = input.chars().next().unwrap();
         match ch {
             // 나머지 제어 문자들은 필터링
@@ -33,8 +35,29 @@ fn process_and_filter_terminal_input(event: &TerminalKeyEvent, korean_ime: &Arc<
                     return None;
                 }
             }
-            // macOS 특수 키 범위 필터링
-            '\u{f700}'..='\u{f8ff}' => {
+            // macOS 특수 키 처리 (방향키 등)
+            '\u{f700}' => {
+                // Up Arrow - ANSI escape sequence로 변환
+                log::debug!("Converting macOS Up Arrow to ANSI: {:?} -> {:?}", ch, "\x1b[A");
+                return Some(("\x1b[A".to_string(), None));
+            }
+            '\u{f701}' => {
+                // Down Arrow - ANSI escape sequence로 변환
+                log::debug!("Converting macOS Down Arrow to ANSI: {:?} -> {:?}", ch, "\x1b[B");
+                return Some(("\x1b[B".to_string(), None));
+            }
+            '\u{f702}' => {
+                // Left Arrow - ANSI escape sequence로 변환
+                log::debug!("Converting macOS Left Arrow to ANSI: {:?} -> {:?}", ch, "\x1b[D");
+                return Some(("\x1b[D".to_string(), None));
+            }
+            '\u{f703}' => {
+                // Right Arrow - ANSI escape sequence로 변환
+                log::debug!("Converting macOS Right Arrow to ANSI: {:?} -> {:?}", ch, "\x1b[C");
+                return Some(("\x1b[C".to_string(), None));
+            }
+            // 기타 macOS 특수 키 범위는 필터링
+            '\u{f704}'..='\u{f8ff}' => {
                 log::debug!("Filtered macOS special key: {:?} (\\u{{{:04x}}})", ch, ch as u32);
                 return None;
             }
@@ -352,41 +375,38 @@ impl UIManager {
                     if let Ok(tm) = terminal_manager.try_lock() {
                         if let Some(active_session) = tm.get_active_session() {
                             let session_id = active_session.id;
+                            let bytes_str = String::from_utf8_lossy(&key_bytes);
                             
-                            // 조합 중인지 확인하고, 조합 중이면 조합만 완료하고 특수키는 무효화
-                            let was_composing = if let Ok(ime) = korean_ime.try_lock() {
-                                ime.terminal_states.get(&session_id)
-                                    .map(|state| state.is_composing)
-                                    .unwrap_or(false)
-                            } else {
-                                false
+                            // 특수키를 IME를 통해 처리 (조합 상태 확인 포함)
+                            let (filtered_input, current_composition) = match process_and_filter_terminal_input(&TerminalKeyEvent {
+                                text: bytes_str.to_string().into(),
+                                modifiers: event.modifiers.clone(),
+                                repeat: event.repeat,
+                            }, &korean_ime, session_id) {
+                                Some((processed, composition)) => (processed, composition),
+                                None => {
+                                    log::debug!("Filtered special key: {:?}", bytes_str);
+                                    return;
+                                }
                             };
                             
-                            if was_composing {
-                                // 조합 중이면 조합만 완료하고 특수키는 전송하지 않음
-                                if let Ok(mut ime) = korean_ime.try_lock() {
-                                    if let Some(completed) = ime.finalize_composition(session_id) {
-                                        if let Err(e) = tm.write_to_session(session_id, &completed.to_string()) {
-                                            log::error!("Failed to write completed Korean char: {}", e);
-                                        }
-                                    }
-                                    
-                                    // UI 업데이트 - 조합 완료로 composition_text 비우기
-                                    if let Some(window) = window_weak.upgrade() {
-                                        let mut terminal_state = window.get_terminal_state();
-                                        terminal_state.composition_text = "".into();
-                                        window.set_terminal_state(terminal_state);
-                                        log::debug!("Korean composition completed on special key (key ignored)");
-                                    }
-                                }
-                            } else {
-                                // 조합 중이 아니면 정상적으로 특수키 전송
-                                let bytes_str = String::from_utf8_lossy(&key_bytes);
-                                if let Err(e) = tm.write_to_session(session_id, &bytes_str) {
-                                    log::error!("Failed to write key bytes to terminal: {}", e);
+                            // 완성된 텍스트만 터미널로 전송
+                            if !filtered_input.is_empty() {
+                                if let Err(e) = tm.write_to_session(session_id, &filtered_input) {
+                                    log::error!("Failed to write special key to terminal: {}", e);
                                 } else {
-                                    log::debug!("Sent key bytes: {:?} -> {}", key_bytes, bytes_str.escape_debug());
+                                    log::debug!("Sent special key: {:?} -> {}", key_bytes, filtered_input.escape_debug());
                                 }
+                            }
+                            
+                            // 조합 중인 글자 UI 업데이트
+                            if let Some(window) = window_weak.upgrade() {
+                                let mut terminal_state = window.get_terminal_state();
+                                terminal_state.composition_text = current_composition
+                                    .map(|c| c.to_string())
+                                    .unwrap_or_default()
+                                    .into();
+                                window.set_terminal_state(terminal_state);
                             }
                         }
                     } else {
@@ -404,7 +424,7 @@ impl UIManager {
                         if !event.modifiers.control && !event.modifiers.alt && !event.modifiers.meta {
                             if let Ok(last_time) = last_control_key_time.try_lock() {
                                 let elapsed = last_time.elapsed();
-                                if elapsed < std::time::Duration::from_millis(50) && event.text.len() == 1 {
+                                if elapsed < std::time::Duration::from_millis(50) && event.text.chars().count() == 1 {
                                     // 최근 50ms 내에 control 키가 눌렸고 단일 문자라면 무시
                                     log::debug!("Ignoring duplicate text event after Ctrl key: {:?}", event.text);
                                     return;
@@ -730,6 +750,7 @@ impl UIManager {
     /// tterm 스타일: 키 이벤트를 터미널 바이트로 변환 (특수키 + modifier 조합)
     fn convert_key_event_to_terminal_bytes(event: &TerminalKeyEvent) -> Option<Vec<u8>> {
         let text = event.text.as_str();
+        log::debug!("convert_key_event_to_terminal_bytes called with: {:?}", text);
         
         // 1. 먼저 특수키들을 처리 (텍스트와 무관한 키들)
         if let Some(special_bytes) = Self::handle_special_keys(text) {
@@ -756,6 +777,7 @@ impl UIManager {
     
     /// 특수키들을 터미널 바이트로 변환 (tterm 스타일)
     fn handle_special_keys(text: &str) -> Option<Vec<u8>> {
+        log::debug!("handle_special_keys called with: {:?}", text);
         match text {
             // 백스페이스 (\u{08})
             "\u{08}" => Some(vec![0x7F]), // DEL (127)
@@ -940,7 +962,7 @@ impl UIManager {
         }
         
         // Single character Ctrl combinations
-        if text.len() == 1 {
+        if text.chars().count() == 1 {
             let ch = text.chars().next()?;
             match ch.to_ascii_lowercase() {
                 'a' => Some(b"\x01".to_vec()), // Ctrl+A

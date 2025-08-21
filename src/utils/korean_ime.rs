@@ -94,6 +94,29 @@ impl KoreanIME {
     pub fn process_input(&mut self, terminal_id: usize, input_text: &str) -> (String, bool, Option<char>) {
         let state = self.get_or_create_state(terminal_id);
         let mut result = String::new();
+        
+        // ANSI escape sequence 처리 (방향키 등)
+        if input_text.starts_with("\x1b[") {
+            if state.is_composing {
+                // 조합 중이면 조합만 완료하고 escape sequence 무효화
+                if let Some(composed) = state.get_current_char() {
+                    result.push(composed);
+                }
+                state.reset();
+                // escape sequence는 전송하지 않음
+            } else {
+                // 조합 중이 아니면 정상적으로 전송
+                result.push_str(input_text);
+            }
+            
+            let current_composition = if state.is_composing {
+                state.get_display_char()
+            } else {
+                None
+            };
+            
+            return (result, state.is_composing, current_composition);
+        }
 
         for ch in input_text.chars() {
             if is_korean_jamo(ch) {
